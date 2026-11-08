@@ -103,7 +103,7 @@
             },
             {
               "@type": "MOD.Core.CanvasGroupComponent",
-              "BlocksRaycasts": true,
+              "BlocksRaycasts": false,
               "GroupAlpha": 1,
               "Interactable": true,
               "Enable": true

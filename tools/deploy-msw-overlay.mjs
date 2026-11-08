@@ -262,7 +262,7 @@ function mergeVillageOntoMap(mapJson, overlay, targetRoot, mode) {
   const body = BODY_BY_MODE[mode];
   const stringify = entities.some((entity) => typeof entity.jsonString === 'string');
   const standY = ensureFloor(merged, mode, targetRoot, stringify);
-  settleSpawn(entities, standY, stringify);
+  settleSpawn(entities, standY, targetRoot, stringify);
   for (const source of village.ContentProto.Entities) {
     const sourceJson = entityJson(source);
     const name = sourceJson.name || String(sourceJson.path || source.path || '').split('/').pop();
@@ -403,16 +403,65 @@ function blankTileEntity(targetRoot, strip) {
   };
 }
 
-function settleSpawn(entities, standY, stringify) {
-  for (const entity of entities) {
+function settleSpawn(entities, standY, targetRoot, stringify) {
+  const existing = entities.find((entity) => {
     const js = entityJson(entity);
     const name = js.name || String(js.path || entity.path || '').split('/').pop();
-    if (name !== 'SpawnLocation') continue;
-    const transform = (js['@components'] ?? []).find((component) => component['@type'] === 'MOD.Core.TransformComponent');
-    if (!transform?.Position || Math.abs(Number(transform.Position.y) - standY) <= 1.5) continue;
-    transform.Position.y = standY;
-    writeEntity(entity, js, stringify);
+    return name === 'SpawnLocation';
+  });
+  if (!existing) {
+    entities.push(spawnEntity(targetRoot, standY));
+    const created = entities[entities.length - 1];
+    if (stringify) writeEntity(created, entityJson(created), true);
+    return;
   }
+  const js = entityJson(existing);
+  const transform = (js['@components'] ?? []).find((component) => component['@type'] === 'MOD.Core.TransformComponent');
+  if (!transform?.Position) return;
+  // The avatar starts at this entity. A gap under 1.5 still leaves it off the tile row.
+  if (Number(transform.Position.y) === standY) return;
+  transform.Position.y = standY;
+  writeEntity(existing, js, stringify);
+}
+
+function spawnEntity(targetRoot, standY) {
+  const id = crypto.randomUUID();
+  const entityPath = `${targetRoot}/SpawnLocation`;
+  return {
+    id,
+    path: entityPath,
+    componentNames: 'MOD.Core.TransformComponent,MOD.Core.SpriteRendererComponent,MOD.Core.SpawnLocationComponent',
+    jsonString: {
+      name: 'SpawnLocation',
+      path: entityPath,
+      nameEditable: true,
+      enable: true,
+      visible: true,
+      localize: false,
+      displayOrder: 2,
+      pathConstraints: '///',
+      revision: 0,
+      modelId: null,
+      '@components': [
+        {
+          '@type': 'MOD.Core.TransformComponent',
+          Rotation: { x: 0, y: 0, z: 0 },
+          Position: { x: 0, y: standY, z: 999.999 },
+          QuaternionRotation: { x: 0, y: 0, z: 0, w: 1 },
+          Scale: { x: 1, y: 1, z: 1 },
+          ZRotation: 0,
+          Enable: true,
+        },
+        {
+          '@type': 'MOD.Core.SpriteRendererComponent',
+          SortingLayer: 'Default',
+          SpriteRUID: '8ef238e0d0ca4bb783aca526cff35d11',
+          Enable: true,
+        },
+        { '@type': 'MOD.Core.SpawnLocationComponent', Enable: true },
+      ],
+    },
+  };
 }
 
 function placeOnFloor(js, standY) {

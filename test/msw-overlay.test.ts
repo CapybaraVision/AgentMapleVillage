@@ -136,6 +136,16 @@ describe('Basic workspace deploy', () => {
     expect(bareTiles?.some((tile) => tile.position.x === 0 && tile.position.y === -1)).toBe(true);
     const bareMode = bareMap.ContentProto.Entities.find((entity) => entity.path === '/maps/map01')?.jsonString?.['@components']?.find((component) => component['@type'] === 'MOD.Core.MapComponent');
     expect(bareMode?.TileMapMode).toBe(2);
+    const bareSpawn = bareMap.ContentProto.Entities.find((entity) => entity.path === '/maps/map01/SpawnLocation');
+    const bareSpawnPos = bareSpawn?.jsonString?.['@components']?.find((component) => component['@type'] === 'MOD.Core.TransformComponent') as { Position?: { y?: number } };
+    expect(bareSpawnPos.Position?.y).toBe(0);
+    expect(fs.existsSync(path.join(bare.workspace, 'RootDesk/MyDesk/DefaultPlayer.model'))).toBe(false);
+    const deployedUi = JSON.parse(fs.readFileSync(path.join(bare.workspace, 'ui/AgentMapleDesk.ui'), 'utf8')) as {
+      ContentProto?: { Entities?: Array<{ path?: string; jsonString?: { '@components'?: Array<Record<string, unknown>> } }> };
+    };
+    const deskRoot = deployedUi.ContentProto?.Entities?.find((entity) => entity.path === '/ui/AgentMapleDesk');
+    const canvas = deskRoot?.jsonString?.['@components']?.find((component) => component['@type'] === 'MOD.Core.CanvasGroupComponent');
+    expect(canvas?.BlocksRaycasts).toBe(false);
 
     const { workspace } = basicWorkspace(2, false);
     const map = JSON.parse(fs.readFileSync(path.join(workspace, 'map/map01.map'), 'utf8')) as {
@@ -182,6 +192,42 @@ describe('Basic workspace deploy', () => {
     expect(keep.Position).toMatchObject({ x: 1, y: 2 });
     const spawn = written.ContentProto.Entities.find((entity) => entity.path === '/maps/map01/SpawnLocation')?.jsonString?.['@components']?.find((component) => component['@type'] === 'MOD.Core.TransformComponent') as { Position?: { x?: number; y?: number } };
     expect(spawn.Position).toMatchObject({ x: 2, y: 4 });
+    const near = basicWorkspace(2, false);
+    const nearMap = JSON.parse(fs.readFileSync(path.join(near.workspace, 'map/map01.map'), 'utf8')) as {
+      ContentProto: { Entities: Array<Record<string, unknown>> };
+    };
+    const nearTiles = [];
+    for (let x = -4; x < 4; x += 1) nearTiles.push({ type: 0, position: { x, y: -1 }, tileIndex: 87 });
+    nearMap.ContentProto.Entities.push({
+      id: '55555555-5555-4555-8555-555555555555',
+      path: '/maps/map01/RectTileMap',
+      componentNames: 'MOD.Core.RectTileMapComponent',
+      jsonString: {
+        name: 'RectTileMap',
+        path: '/maps/map01/RectTileMap',
+        '@components': [{ '@type': 'MOD.Core.RectTileMapComponent', TileSetRUID: 'tileset://already-here', Enable: true, tileMap: nearTiles }],
+      },
+    });
+    nearMap.ContentProto.Entities.push({
+      id: '66666666-6666-4666-8666-666666666666',
+      path: '/maps/map01/SpawnLocation',
+      componentNames: 'MOD.Core.TransformComponent,MOD.Core.SpawnLocationComponent',
+      jsonString: {
+        name: 'SpawnLocation',
+        path: '/maps/map01/SpawnLocation',
+        '@components': [
+          { '@type': 'MOD.Core.TransformComponent', Position: { x: 3, y: 1, z: 4 }, Enable: true },
+          { '@type': 'MOD.Core.SpawnLocationComponent', Enable: true },
+        ],
+      },
+    });
+    fs.writeFileSync(path.join(near.workspace, 'map/map01.map'), JSON.stringify(nearMap));
+    expect(runDeploy(near.workspace).status).toBe(0);
+    const nearWritten = JSON.parse(fs.readFileSync(path.join(near.workspace, 'map/map01.map'), 'utf8')) as {
+      ContentProto: { Entities: Array<{ path?: string; jsonString?: { '@components'?: Array<Record<string, unknown>> } }> };
+    };
+    const nearSpawn = nearWritten.ContentProto.Entities.find((entity) => entity.path === '/maps/map01/SpawnLocation')?.jsonString?.['@components']?.find((component) => component['@type'] === 'MOD.Core.TransformComponent') as { Position?: { x?: number; y?: number; z?: number } };
+    expect(nearSpawn.Position).toMatchObject({ x: 3, y: 0, z: 4 });
     const mode = written.ContentProto.Entities.find((entity) => entity.path === '/maps/map01')?.jsonString?.['@components']?.find((component) => component['@type'] === 'MOD.Core.MapComponent');
     expect(mode?.TileMapMode).toBe(2);
   });
