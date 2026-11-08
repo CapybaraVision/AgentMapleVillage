@@ -1,5 +1,7 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { assertReadOnlyClaudeArgs, parseClaudePrintJson, readOnlyClaudeArgs } from '../src/claude-cli.js';
+import { assertReadOnlyClaudeArgs, MAX_BUDGET_USD_NOTE, MAX_TURNS_ON_CLAUDE_2_1_318, parseClaudePrintJson, readOnlyClaudeArgs } from '../src/claude-cli.js';
 import { probeAllowed } from '../src/bin/claude-readonly-probe.js';
 import { unixMillisFromMswElapsed } from '../src/msw-clock.js';
 import { postJson } from '../src/http-client.js';
@@ -13,6 +15,17 @@ describe('read-only Claude CLI contract', () => {
     assertReadOnlyClaudeArgs(second);
     expect(second[second.indexOf('--resume') + 1]).toBe('sess_real');
     expect(first).not.toContain('--resume');
+    expect(first).not.toContain('--max-turns');
+    expect(first).not.toContain('--max-budget-usd');
+    expect(MAX_TURNS_ON_CLAUDE_2_1_318.passedByProbe).toBe(false);
+    expect(MAX_TURNS_ON_CLAUDE_2_1_318.blocker).toContain('2.1.318');
+    expect(MAX_BUDGET_USD_NOTE).toContain('not a proven hard dollar cap');
+    const docs = fs.readFileSync(path.join(process.cwd(), 'docs/windows-validate.md'), 'utf8');
+    expect(docs).toContain('2.1.318');
+    expect(docs).toContain('`--max-turns`는 그 도움말에 없습니다');
+    expect(docs).toContain('확정된 달러 상한이라고 문서화되어 있지 않습니다');
+    expect(docs).not.toContain('--max-turns 1');
+    expect(docs).not.toContain('--max-budget-usd 0.05');
     expect(() => readOnlyClaudeArgs('x', 'sess') && assertReadOnlyClaudeArgs(['-p', 'x', '--dangerously-skip-permissions'])).toThrow(/dangerously-skip-permissions/);
     expect(() => assertReadOnlyClaudeArgs(['-p', 'x', '--permission-mode', 'bypassPermissions', '--tools', ''])).toThrow(/default/);
     const parsed = parseClaudePrintJson('log line\n{"session_id":"sess_real","result":"pong"}');

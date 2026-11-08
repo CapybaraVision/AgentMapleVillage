@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { FakeClaudeDriver } from '../src/claude-driver.js';
 import { DesktopDisabledError, createDesktopAdapter } from '../src/desktop.js';
@@ -119,7 +120,7 @@ describe('desktop adapter', () => {
     expect(flagged.enabled).toBe(true);
     await expect(disabled.run('screenshot')).rejects.toBeInstanceOf(DesktopDisabledError);
     await expect(flagged.run('click')).rejects.toBeInstanceOf(DesktopDisabledError);
-    const source = fs.readFileSync(new URL('../src/desktop.ts', import.meta.url), 'utf8');
+    const source = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '../src/desktop.ts'), 'utf8');
     expect(source).not.toMatch(/createServer|net\.listen|child_process/);
   });
 });

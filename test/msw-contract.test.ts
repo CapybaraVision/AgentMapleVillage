@@ -1,8 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', 'msw', 'scripts');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'msw', 'scripts');
 
 describe('msw script contract', () => {
   const files = fs.readdirSync(root).filter((file) => file.endsWith('.mlua'));

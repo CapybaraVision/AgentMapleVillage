@@ -1,39 +1,45 @@
 /**
- * Argument list for the documented Claude Code print CLI.
+ * Argument list for a read-only Claude Code print probe aimed at CLI 2.1.318.
  * Sources checked 2026-11-08:
  * - https://code.claude.com/docs/en/headless
  * - https://code.claude.com/docs/en/cli-reference
+ * - https://code.claude.com/docs/en/changelog
  *
- * The read-only probe uses `--output-format json` because that page shows
- * `session_id` on the JSON object and `--resume` taking that id.
- * `--tools ""` removes built-in tools. `--permission-mode default` does not
- * bypass prompts. `--dangerously-skip-permissions` and `bypassPermissions`
- * are rejected by assertReadOnlyClaudeArgs.
+ * Installed Claude Code 2.1.318 `--help` lists `--output-format json`,
+ * `--tools`, `--permission-mode default`, `--resume`, and `--max-budget-usd`.
+ * It does not list `--max-turns`. The current CLI reference documents
+ * `--max-turns` for print mode and does not name a minimum version that
+ * includes 2.1.318. The probe therefore does not pass `--max-turns`.
+ *
+ * `--max-budget-usd` is documented as a client-side estimate of API-call
+ * spend, which can differ from a bill. It is not a proven hard dollar cap
+ * for claude.ai subscription usage, so this probe does not pass it and does
+ * not describe it as one.
+ *
+ * Turn bounding for 2.1.318 is the script itself: one print, then one
+ * `--resume` print, each killed by an external timeout. `--tools ""` removes
+ * built-in tools. `--permission-mode default` does not bypass prompts.
  */
 
-export const READONLY_MAX_TURNS = '1';
-export const READONLY_BUDGET_USD = '0.05';
 export const READONLY_TIMEOUT_MS = 45_000;
+
+export const MAX_TURNS_ON_CLAUDE_2_1_318 = {
+  flag: '--max-turns',
+  installedHelpListsIt: false,
+  passedByProbe: false,
+  blocker:
+    'Claude Code 2.1.318 --help omits --max-turns. The CLI reference at https://code.claude.com/docs/en/cli-reference lists the flag without a minimum version that includes 2.1.318, so the probe does not pass it.',
+} as const;
+
+export const MAX_BUDGET_USD_NOTE =
+  'Official --max-budget-usd stops a print run at a client-side estimate of API-call spend. It is not a proven hard dollar cap for claude.ai subscription usage. The probe does not pass it.';
 
 const BANNED_FLAGS = ['--dangerously-skip-permissions', '--allowedTools', '--allowed-tools', '--bare'];
 const BANNED_MODES = new Set(['bypassPermissions', 'acceptEdits', 'dontAsk', 'auto']);
 
 export function readOnlyClaudeArgs(prompt: string, resumeSessionId?: string): string[] {
   if (!prompt.trim()) throw new Error('prompt is empty');
-  const args = [
-    '-p',
-    prompt,
-    '--output-format',
-    'json',
-    '--max-turns',
-    READONLY_MAX_TURNS,
-    '--max-budget-usd',
-    READONLY_BUDGET_USD,
-    '--tools',
-    '',
-    '--permission-mode',
-    'default',
-  ];
+  const args = ['-p', prompt, '--output-format', 'json', '--tools', '', '--permission-mode', 'default'];
   if (resumeSessionId) args.push('--resume', resumeSessionId);
   assertReadOnlyClaudeArgs(args);
   return args;
@@ -50,9 +56,8 @@ export function assertReadOnlyClaudeArgs(args: string[]): void {
   }
   const toolsAt = args.indexOf('--tools');
   if (toolsAt < 0 || args[toolsAt + 1] !== '') throw new Error('read-only Claude args must pass --tools with an empty list');
-  if (!args.includes('--max-turns') || !args.includes('--max-budget-usd')) {
-    throw new Error('read-only Claude args must bound turns and budget');
-  }
+  if (args.includes('--max-turns')) throw new Error(MAX_TURNS_ON_CLAUDE_2_1_318.blocker);
+  if (args.includes('--max-budget-usd')) throw new Error(MAX_BUDGET_USD_NOTE);
 }
 
 export interface ClaudePrintJson {

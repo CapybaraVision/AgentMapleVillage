@@ -48,12 +48,15 @@ npx tsx src/bin/relay.ts
 powershell -File scripts\windows\validate-claude.ps1 -NodeExe $node -RunClaude
 ```
 
+설치된 Claude Code 2.1.318의 `--help`에는 `--output-format json`, `--tools`, `--permission-mode default`, `--resume`, `--max-budget-usd`가 있습니다. `--max-turns`는 그 도움말에 없습니다. 2026-11-08의 공식 CLI 참고(https://code.claude.com/docs/en/cli-reference)는 `--max-turns`를 print 모드 플래그로 적지만, 2.1.318이 포함되는 최소 버전은 적지 않습니다. 그래서 이 프로브는 `--max-turns`를 넘기지 않습니다. 넘기면 그 버전이 알 수 없는 플래그로 거부할 수 있고, 그 거부를 여기서 실행해 확인하지는 않았습니다.
+
+`--max-budget-usd`는 공식 문장으로 API 호출에 대한 클라이언트 견적이 그 금액에 닿으면 멈추는 플래그입니다. 청구액과 다를 수 있다고도 적혀 있습니다. claude.ai 구독 사용량의 확정된 달러 상한이라고 문서화되어 있지 않습니다. 이 PC의 인증은 claude.ai이므로 프로브는 그 플래그를 넘기지 않고, 구독 한도처럼 설명하지 않습니다.
+
 하는 일:
 
 1. 빈 디렉터리를 만듭니다.
-2. `claude -p`에 `--output-format json`, `--max-turns 1`, `--max-budget-usd 0.05`, `--tools` 빈 목록, `--permission-mode default`만 붙입니다.
-3. `session_id`를 읽고, 같은 빈 디렉터리에서 `--resume`으로 한 번 더 묻습니다.
-4. 두 `session_id`가 같아야 성공입니다.
-5. 각 실행은 45초를 넘기면 프로세스를 끝냅니다.
+2. 프로세스를 두 번만 띄웁니다. 각각 `claude -p`, `--output-format json`, `--tools` 빈 목록, `--permission-mode default`입니다. 두 번째는 같은 디렉터리에서 `--resume`과 첫 JSON의 `session_id`를 붙입니다.
+3. 두 `session_id`가 같아야 성공입니다.
+4. 각 실행은 45초를 넘기면 그 프로세스를 끝냅니다. 턴 상한은 이 두 번의 호출입니다. CLI 안의 `--max-turns`가 아닙니다.
 
-`--dangerously-skip-permissions`, `bypassPermissions`, `--allowedTools`는 코드에서 거부합니다. 출력 JSON에 환경 변수는 찍지 않습니다. 이 확인은 읽기 전용 한 단어 응답입니다. 사무실의 쓰기 작업이 검증된 것은 아닙니다.
+`--dangerously-skip-permissions`, `bypassPermissions`, `--allowedTools`, `--max-turns`, `--max-budget-usd`는 이 프로브 인자 검사에서 거부합니다. 출력 JSON에 환경 변수는 찍지 않습니다. 이 확인은 읽기 전용 한 단어 응답입니다. 사무실의 쓰기 작업이 검증된 것은 아닙니다. 클라우드에서는 이 프로브를 실행하지 않았습니다.

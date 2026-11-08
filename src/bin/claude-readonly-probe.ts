@@ -1,6 +1,8 @@
 /**
- * Smallest real Claude Code check: two read-only print turns in an empty directory.
- * Does not start unless this process's environment sets AGENTMAPLE_RUN_CLAUDE_PROBE=1.
+ * Smallest real Claude Code check for CLI 2.1.318: two read-only print processes
+ * in an empty directory. The script makes those two calls and kills each at
+ * READONLY_TIMEOUT_MS. It does not pass --max-turns or --max-budget-usd.
+ * Does not start unless this process sets AGENTMAPLE_RUN_CLAUDE_PROBE=1.
  * The cloud workspace must not set that variable. No secrets are printed.
  */
 import fs from 'node:fs';
