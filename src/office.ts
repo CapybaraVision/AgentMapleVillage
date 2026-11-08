@@ -21,6 +21,7 @@ import { readJson, writeJsonAtomic } from './persist.js';
 import type { SessionDriver, TurnResult } from './claude-driver.js';
 import { emptyLibrary, Library, LibraryError, migrateLibrary, type KnowledgeEdge, type KnowledgeNode, type LibraryPanel, type LibraryState } from './library.js';
 import { FLOOR_Y, seatFor } from './seats.js';
+import { ensureSessionHome } from './session-home.js';
 import { LibraryDatabase, openLibraryDatabase } from './library-db.js';
 
 export interface Clock {
@@ -231,6 +232,8 @@ export class Office {
       const opened = openLibraryDatabase(opts.file, office.state.library, office.state.villageId);
       office.libraryDb = opened.db;
       office.state.library = opened.library;
+      const profileDir = path.dirname(opts.file);
+      for (const character of office.state.characters) ensureSessionHome(profileDir, character.sessionId, character.role);
     }
     if (opts.villageId) office.bindVillage(opts.villageId);
     office.save();
@@ -266,6 +269,10 @@ export class Office {
     this.save();
   }
 
+  approvalsFor(sessionId: string): Array<{ commandId: string; decision: string; writes: boolean }> {
+    return this.libraryDb?.approvalsFor(sessionId) ?? [];
+  }
+
   get snapshot(): OfficeState {
     return structuredClone(this.state);
   }
@@ -289,6 +296,20 @@ export class Office {
       return { result: { ...prior.result, duplicate: true }, events: prior.events.map((event) => ({ ...event, payload: { ...event.payload } })) };
     }
     const produced = await this.dispatch(type, payload);
+    if (type === 'decision.answer' && this.libraryDb && this.file) {
+      const decisionId = typeof payload.decisionId === 'string' ? payload.decisionId : '';
+      const decision = this.state.decisions.find((item) => item.id === decisionId);
+      if (decision) {
+        this.libraryDb.recordApproval({
+          commandId,
+          sessionId: decision.sessionId,
+          decision: typeof payload.option === 'string' ? payload.option : 'text',
+          writes: payload.option === '이대로 진행',
+          recordedAt: this.clock.now(),
+        });
+        ensureSessionHome(path.dirname(this.file), decision.sessionId, this.requireCharacter(decision.sessionId).role);
+      }
+    }
     produced.events.forEach((event, index) => {
       event.eventId = `${commandId}:${index}`;
     });
@@ -591,6 +612,7 @@ export class Office {
       this.state.characters.push(character);
     }
     if (character.homeX === undefined) Object.assign(character, seatFields(sessionId, Math.max(0, this.state.characters.length - 1)));
+    if (this.file) ensureSessionHome(path.dirname(this.file), sessionId, role);
     if (!bySession) {
       character.station = 'home';
       character.activity = '집에서 쉬는 중';

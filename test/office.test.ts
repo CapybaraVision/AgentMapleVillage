@@ -97,6 +97,24 @@ describe('office sim', () => {
     expect(office.snapshot.characters.find((item) => item.sessionId === DEFAULT_WORKER_SESSION)?.station).toBe('user');
     expect(office.snapshot.decisions.filter((item) => item.status === 'open')).toHaveLength(1);
   });
+
+  it('keeps a private workspace and one approval row per session across restart', async () => {
+    const folder = dir();
+    const file = path.join(folder, 'state.json');
+    const office = Office.create({ backend: simBackend(), file, villageId: 'vil_alpha' });
+    expect(fs.existsSync(path.join(folder, 'sessions', DEFAULT_WORKER_SESSION, 'bound.json'))).toBe(true);
+    expect(fs.existsSync(path.join(folder, 'sessions', DEFAULT_FOREMAN_SESSION, 'bound.json'))).toBe(true);
+    await office.apply('bind-a', 'character.bind', { sessionId: 'ses_alpha', mapleActorId: 'npc-alpha', displayName: '갑', role: 'worker' });
+    expect(JSON.parse(fs.readFileSync(path.join(folder, 'sessions', 'ses_alpha', 'bound.json'), 'utf8')).sessionId).toBe('ses_alpha');
+    await office.apply('goal-1', 'goal.submit', { text: '세션 작업 공간', targetSessionId: 'ses_alpha' });
+    const decisionId = office.snapshot.decisions.find((item) => item.sessionId === 'ses_alpha')!.id;
+    await office.apply('answer-1', 'decision.answer', { decisionId, option: '이대로 진행' });
+    await office.apply('answer-1', 'decision.answer', { decisionId, option: '이대로 진행' });
+    expect(office.approvalsFor('ses_alpha')).toEqual([{ commandId: 'answer-1', decision: '이대로 진행', writes: true }]);
+    const again = Office.load({ file, backend: simBackend() });
+    expect(again.approvalsFor('ses_alpha')).toHaveLength(1);
+    expect(again.snapshot.library.nodes.some((node) => node.sessionId === 'ses_alpha' && node.kind === 'summary')).toBe(true);
+  });
 });
 
 describe('claude session resume', () => {

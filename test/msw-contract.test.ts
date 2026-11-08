@@ -31,7 +31,8 @@ describe('msw script contract', () => {
     expect(npc).toContain('Station == "meeting"');
     expect(npc).toContain('self.HomeX');
     expect(relay).toContain('meeting.invite');
-    expect(npc).toContain('targetY = self.FloorY');
+    expect(npc).toContain('MoveToDirection');
+    expect(npc).not.toContain('SetWorldPosition');
     expect(relay).toContain('library.search');
     expect(hall).toContain('SubmitLibrarySearch');
     expect(hall).toContain('kn_');

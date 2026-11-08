@@ -59,6 +59,13 @@ CREATE TABLE IF NOT EXISTS counters (
   name TEXT PRIMARY KEY,
   value INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS approvals (
+  command_id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  decision TEXT NOT NULL,
+  writes INTEGER NOT NULL,
+  recorded_at INTEGER NOT NULL
+);
 `;
 
 export function libraryDbPath(stateFile: string): string {
@@ -155,6 +162,22 @@ export class LibraryDatabase {
       this.db.exec('ROLLBACK');
       throw error;
     }
+  }
+
+  recordApproval(input: { commandId: string; sessionId: string; decision: string; writes: boolean; recordedAt: number }): boolean {
+    const result = this.db.prepare(
+      'INSERT INTO approvals (command_id, session_id, decision, writes, recorded_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(command_id) DO NOTHING',
+    ).run(input.commandId, input.sessionId, input.decision, input.writes ? 1 : 0, input.recordedAt);
+    return Number(result.changes) === 1;
+  }
+
+  approvalsFor(sessionId: string): Array<{ commandId: string; decision: string; writes: boolean }> {
+    const rows = this.db.prepare('SELECT command_id, decision, writes FROM approvals WHERE session_id = ? ORDER BY recorded_at, command_id').all(sessionId) as Array<{
+      command_id: string;
+      decision: string;
+      writes: number;
+    }>;
+    return rows.map((row) => ({ commandId: row.command_id, decision: row.decision, writes: row.writes === 1 }));
   }
 
   private counter(name: string): number {

@@ -54,10 +54,9 @@ script OfficeNpc extends Component
 
 	@ExecSpace("ServerOnly")
 	method void Step(number delta)
-		-- One horizontal floor. Y stays on the desk line captured at start.
-		-- conceptY bands in the anchor manifest are not a path.
+		-- Horizontal input only. MoveToDirection is the documented MovementComponent call.
+		-- The body keeps the entity on the tile or foothold. This is not pathfinding and not a walk clip.
 		local targetX = self.HomeX
-		local targetY = self.FloorY
 		if self.Station == "desk" then
 			targetX = self.DeskX
 		elseif self.Station == "meeting" then
@@ -74,20 +73,18 @@ script OfficeNpc extends Component
 		end
 		local pos = self.Entity.TransformComponent.WorldPosition
 		local dx = targetX - pos.x
-		local dy = targetY - pos.y
-		local distance = (dx * dx + dy * dy) ^ 0.5
-		if distance < 0.15 then
+		if dx < 0.15 and dx > -0.15 then
 			if self.Station == "home" and self.Pace == true then
 				self.PaceDir = self.PaceDir * -1
 			end
 			self.Entity.MovementComponent:Stop()
 			return
 		end
-		local step = self.MoveSpeed * delta
-		if step > distance then
-			step = distance
+		local direction = 1
+		if dx < 0 then
+			direction = -1
 		end
-		-- SetWorldPosition is documented. This does not claim a walking animation or pathfinding.
-		self.Entity.MovementComponent:SetWorldPosition(Vector2(pos.x + (dx / distance) * step, pos.y + (dy / distance) * step))
+		self.Entity.MovementComponent.InputSpeed = self.MoveSpeed
+		self.Entity.MovementComponent:MoveToDirection(Vector2(direction, 0), delta)
 	end
 end

@@ -1,4 +1,5 @@
 import { startRelay } from '../relay.js';
+import { resolveListenHost } from '../relay-listen.js';
 
 const rootToken = process.env.RELAY_ROOT_TOKEN ?? '';
 if (rootToken.length < 16) {
@@ -7,7 +8,7 @@ if (rootToken.length < 16) {
 }
 
 const port = Number(process.env.RELAY_PORT ?? '8787');
-const host = process.env.RELAY_HOST ?? '127.0.0.1';
+const host = resolveListenHost(process.env.RELAY_HOST, process.env.RELAY_ALLOW_PUBLIC === '1');
 const file = process.env.RELAY_STATE_FILE;
 
 const relay = await startRelay({
