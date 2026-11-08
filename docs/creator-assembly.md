@@ -36,6 +36,12 @@ node tools/deploy-msw-overlay.mjs C:\path\to\the\exported\LocalWorkspace
 
 `npm run sim`은 이 프로세스 안에서 목표를 끝까지 진행합니다. 메이플 세션을 열지 않고 Claude를 호출하지 않습니다.
 
+첫 크리에이터 플레이에서 서버 로그는 `cannot set WorldToken, no such field (at /maps/map01/VillageRelay)`였습니다. 공식 UI 런타임 문서는 선언하지 않은 `self` 대입이 그 오류로 메서드를 멈춘다고 적습니다. `.codeblock`은 메이커 refresh가 `.mlua`에서 만들고, 이 저장소는 그 파일을 쓰지 않습니다. 스크립트가 `OnBeginPlay`까지 실행되었으므로 빠진 것은 WorldToken 프로퍼티 선언입니다. `WorldToken`, `ClockOffset`, `OpenDecisionId`, `Busy`, `Cursor`, `CommandCounter`를 프로퍼티로 선언했습니다. `@Sync`는 붙이지 않았고, 시작할 때 토큰을 비웁니다.
+
+지휘석과 도서관 패널은 닫힌 채로 두고, `지휘석`과 `도서관` 버튼으로 하나씩 엽니다. 버튼 높이는 88이고 다음 칸과 겹치지 않게 간격을 두었습니다. 상태 문구는 `공개 릴레이가 없습니다.`입니다. 공개 HTTPS가 없으므로 `마을 연결 전`이라고 쓰지 않습니다.
+
+다시 배포하면 이미 있는 맵 엔티티의 사용자 값은 유지하고, 없는 스크립트 프로퍼티만 채웁니다. 예전 백업 폴더는 지우지 않습니다. 이 수정은 크리에이터에서 다시 플레이하지 않았습니다.
+
 ## 들어 있는 것
 
 - `map/AgentMapleVillage.map`: 공식 사이드뷰 템플릿으로 만든 원본. TileMapMode 2. 책상 6. 세션 NPC는 `ses_foreman`(S01)과 `ses_worker`(S02)만. 나머지 책상은 빈 자리입니다. SectorConfig가 없는 Basic 월드에서는 이 파일 대신 `map01`에 같은 엔티티를 넣습니다.

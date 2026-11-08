@@ -23,6 +23,16 @@ const BODY_BY_MODE = {
   2: 'MOD.Core.SideviewbodyComponent',
 };
 const BODY_TYPES = new Set(Object.values(BODY_BY_MODE));
+const SCRIPT_PROPERTY_DEFAULTS = {
+  'script.VillageRelay': {
+    WorldToken: '',
+    ClockOffset: null,
+    OpenDecisionId: '',
+    Busy: false,
+    Cursor: 0,
+    CommandCounter: 0,
+  },
+};
 
 export function deployWorkspace(workspace, options = {}) {
   const root = path.resolve(workspace);
@@ -255,7 +265,27 @@ function mergeVillageOntoMap(mapJson, overlay, targetRoot, mode) {
     });
     existingPaths.add(nextPath);
   }
+  fillMissingScriptProperties(entities);
   return merged;
+}
+
+function fillMissingScriptProperties(entities) {
+  for (const entity of entities) {
+    const asString = typeof entity.jsonString === 'string';
+    const js = entityJson(entity);
+    let changed = false;
+    for (const component of js['@components'] ?? []) {
+      const defaults = SCRIPT_PROPERTY_DEFAULTS[component['@type']];
+      if (!defaults) continue;
+      for (const [key, value] of Object.entries(defaults)) {
+        if (!Object.prototype.hasOwnProperty.call(component, key)) {
+          component[key] = value;
+          changed = true;
+        }
+      }
+    }
+    if (changed) entity.jsonString = asString ? JSON.stringify(js) : js;
+  }
 }
 
 function rewritePaths(value, fromRoot, toRoot) {

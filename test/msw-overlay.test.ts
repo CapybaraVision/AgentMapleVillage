@@ -200,6 +200,42 @@ describe('Basic workspace deploy', () => {
     expect(accepted.stderr).not.toContain('ERR_UNSUPPORTED_ESM_URL_SCHEME');
   });
 
+  it('adds missing script properties without replacing a user map edit', () => {
+    const { workspace } = basicWorkspace();
+    const mapPath = path.join(workspace, 'map/map01.map');
+    const map = JSON.parse(fs.readFileSync(mapPath, 'utf8')) as {
+      ContentProto: { Entities: Array<Record<string, unknown>> };
+    };
+    map.ContentProto.Entities.push({
+      id: '22222222-2222-4222-8222-222222222222',
+      path: '/maps/map01/UserTree',
+      componentNames: 'MOD.Core.TransformComponent',
+      jsonString: { name: 'UserTree', path: '/maps/map01/UserTree', '@components': [{ '@type': 'MOD.Core.TransformComponent', Position: { x: 3, y: 1, z: 0 } }] },
+    });
+    map.ContentProto.Entities.push({
+      id: '33333333-3333-4333-8333-333333333333',
+      path: '/maps/map01/VillageRelay',
+      componentNames: 'script.VillageRelay',
+      jsonString: {
+        name: 'VillageRelay',
+        path: '/maps/map01/VillageRelay',
+        '@components': [{ '@type': 'script.VillageRelay', Enable: true, RelayBase: 'https://user.example/v1' }],
+      },
+    });
+    fs.writeFileSync(mapPath, `${JSON.stringify(map)}\n`);
+    expect(runDeploy(workspace).status).toBe(0);
+    const written = JSON.parse(fs.readFileSync(mapPath, 'utf8')) as {
+      ContentProto: { Entities: Array<{ path?: string; jsonString?: { '@components'?: Array<Record<string, unknown>> } }> };
+    };
+    expect(written.ContentProto.Entities.some((entity) => entity.path === '/maps/map01/UserTree')).toBe(true);
+    const relay = written.ContentProto.Entities.find((entity) => entity.path === '/maps/map01/VillageRelay');
+    const script = relay?.jsonString?.['@components']?.find((component) => component['@type'] === 'script.VillageRelay');
+    expect(script?.RelayBase).toBe('https://user.example/v1');
+    expect(script?.WorldToken).toBe('');
+    expect(script?.ClockOffset).toBeNull();
+    expect(script?.CommandCounter).toBe(0);
+  });
+
   it('rolls back a mid-write failure and leaves no partial village files', () => {
     const { parent, workspace, mapBytes } = basicWorkspace();
     const backup = path.join(parent, 'explicit-backup');
@@ -248,6 +284,48 @@ describe('official builder overlay', () => {
     const script = fs.readFileSync(path.join(overlay, 'RootDesk/MyDesk/AgentMapleVillage/GoalDesk.mlua'), 'utf8');
     expect(script).toContain('/ui/AgentMapleDesk/GoalButton');
     expect(fs.readdirSync(overlay, { recursive: true }).some((name) => String(name).endsWith('.codeblock'))).toBe(false);
+  });
+
+  it('keeps closed panels and non-overlapping controls in the generated UI files', () => {
+    for (const name of ['AgentMapleDesk', 'AgentMapleLibrary']) {
+      const ui = readJson(`ui/${name}.ui`) as {
+        ContentProto?: { Entities?: Array<{ jsonString?: { path?: string; enable?: boolean; name?: string; '@components'?: Array<Record<string, unknown>> } }> };
+      };
+      const items = (ui.ContentProto?.Entities ?? []).map((entity) => {
+        const body = entity.jsonString ?? {};
+        const transform = (body['@components'] ?? []).find((component) => component['@type'] === 'MOD.Core.UITransformComponent') as {
+          OffsetMin?: { x: number; y: number };
+          OffsetMax?: { x: number; y: number };
+        } | undefined;
+        return { path: body.path ?? '', enable: body.enable, min: transform?.OffsetMin, max: transform?.OffsetMax };
+      });
+      const board = items.find((item) => item.path === `/ui/${name}/Board`);
+      const opener = items.find((item) => item.path === `/ui/${name}/OpenButton`);
+      expect(board?.enable).toBe(false);
+      expect(opener?.enable).toBe(true);
+      const byParent = new Map<string, typeof items>();
+      for (const item of items) {
+        const parent = item.path.split('/').slice(0, -1).join('/');
+        const list = byParent.get(parent) ?? [];
+        list.push(item);
+        byParent.set(parent, list);
+      }
+      for (const kids of byParent.values()) {
+        for (let left = 0; left < kids.length; left += 1) {
+          for (let right = left + 1; right < kids.length; right += 1) {
+            const a = kids[left];
+            const b = kids[right];
+            if (!a.min || !a.max || !b.min || !b.max) continue;
+            const overlapX = Math.min(a.max.x, b.max.x) - Math.max(a.min.x, b.min.x);
+            const overlapY = Math.min(a.max.y, b.max.y) - Math.max(a.min.y, b.min.y);
+            expect(overlapX > 1 && overlapY > 1, `${a.path} overlaps ${b.path}`).toBe(false);
+          }
+        }
+      }
+    }
+    const desk = fs.readFileSync(path.join(overlay, 'ui/AgentMapleDesk.ui'), 'utf8');
+    expect(desk).toContain('공개 릴레이가 없습니다.');
+    expect(desk).not.toContain('마을 연결 전');
   });
 
   it('keeps every resource id inside the official skill provenance list', () => {

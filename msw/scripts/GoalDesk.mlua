@@ -12,12 +12,42 @@ script GoalDesk extends Component
 	property string StatusTextPath = "/ui/AgentMapleDesk/StatusText"
 	property string QuestionTextPath = "/ui/AgentMapleDesk/QuestionText"
 	property string ResultTextPath = "/ui/AgentMapleDesk/ResultText"
+	property string BoardPath = "/ui/AgentMapleDesk/Board"
+	property string OtherBoardPath = "/ui/AgentMapleLibrary/Board"
 
 	@ExecSpace("ClientOnly")
 	method void OnBeginPlay()
-		self:WriteText(self.StatusTextPath, "마을 연결 전")
+		self:SetEnabled(self.BoardPath, false)
+		self:WriteText(self.StatusTextPath, "공개 릴레이가 없습니다.")
 		self:WriteText(self.QuestionTextPath, "질문이 오면 여기에 표시됩니다.")
 		self:WriteText(self.ResultTextPath, "")
+	end
+
+	@ExecSpace("ClientOnly")
+	method void ToggleBoard()
+		local board = _EntityService:GetEntityByPath(self.BoardPath)
+		if board == nil then
+			return
+		end
+		local open = board.Enable ~= true
+		self:SetEnabled(self.BoardPath, open)
+		if open == true then
+			self:SetEnabled(self.OtherBoardPath, false)
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void SetEnabled(string entityPath, boolean enabled)
+		local entity = _EntityService:GetEntityByPath(entityPath)
+		if entity ~= nil then
+			entity.Enable = enabled
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	@EventSender("Entity", "/ui/AgentMapleDesk/OpenButton")
+	handler HandleOpenButton(ButtonClickEvent event)
+		self:ToggleBoard()
 	end
 
 	@ExecSpace("ClientOnly")
@@ -67,21 +97,25 @@ script GoalDesk extends Component
 		end
 	end
 
+	@ExecSpace("ClientOnly")
 	@EventSender("Entity", "/ui/AgentMapleDesk/PairButton")
 	handler HandlePairButton(ButtonClickEvent event)
 		self:OnPairSubmit()
 	end
 
+	@ExecSpace("ClientOnly")
 	@EventSender("Entity", "/ui/AgentMapleDesk/GoalButton")
 	handler HandleGoalButton(ButtonClickEvent event)
 		self:OnGoalSubmit()
 	end
 
+	@ExecSpace("ClientOnly")
 	@EventSender("Entity", "/ui/AgentMapleDesk/AcceptButton")
 	handler HandleAcceptButton(ButtonClickEvent event)
 		self:OnAccept()
 	end
 
+	@ExecSpace("ClientOnly")
 	@EventSender("Entity", "/ui/AgentMapleDesk/DenyButton")
 	handler HandleDenyButton(ButtonClickEvent event)
 		self:OnDeny()

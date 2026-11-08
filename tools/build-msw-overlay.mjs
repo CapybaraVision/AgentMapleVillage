@@ -83,49 +83,84 @@ map.upsertComponent('VillageRelay', 'script.VillageRelay', {
   WorkerActorId: 'npc-worker',
   ForemanSessionId: 'ses_foreman',
   WorkerSessionId: 'ses_worker',
+  WorldToken: '',
+  ClockOffset: null,
+  OpenDecisionId: '',
+  Busy: false,
+  Cursor: 0,
+  CommandCounter: 0,
 });
 fs.mkdirSync(path.join(outRoot, 'map'), { recursive: true });
 map.write(path.join(outRoot, 'map/AgentMapleVillage.map'));
 
-const button = { rect_size: [220, 88], font_size: 18, color: '#111827', bg_color: { r: 0.9, g: 0.94, b: 1, a: 1 } };
-const field = { rect_size: [360, 40], font_size: 18 };
+const buttonPaint = { font_size: 18, color: '#111827', bg_color: { r: 0.9, g: 0.94, b: 1, a: 1 } };
+
+function stack(ui, prefix, x, y, width) {
+  const gapAfter = { text: 8, input: 8, button: 8 };
+  return {
+    text(name, label, height) {
+      ui.text(`${prefix}/${name}`, label, { size: 18, anchor: 'top-left', pos: [x, y], rect_size: [width, height] });
+      y -= height + gapAfter.text;
+    },
+    input(name, placeholder) {
+      ui.textInput(`${prefix}/${name}`, { placeholder, anchor: 'top-left', pos: [x, y], rect_size: [width, 48], font_size: 18 });
+      y -= 48 + gapAfter.input;
+    },
+    button(name, label) {
+      ui.button(`${prefix}/${name}`, label, { anchor: 'top-left', pos: [x, y], rect_size: [width, 88], ...buttonPaint });
+      y -= 88 + gapAfter.button;
+    },
+    pair(leftName, leftLabel, rightName, rightLabel) {
+      const half = Math.floor((width - 12) / 2);
+      ui.button(`${prefix}/${leftName}`, leftLabel, { anchor: 'top-left', pos: [x, y], rect_size: [half, 88], ...buttonPaint });
+      ui.button(`${prefix}/${rightName}`, rightLabel, { anchor: 'top-left', pos: [x + half + 12, y], rect_size: [width - half - 12, 88], ...buttonPaint });
+      y -= 88 + gapAfter.button;
+    },
+    bottom() {
+      return y;
+    },
+  };
+}
 
 const desk = new UIBuilder('AgentMapleDesk');
-desk.panel('Board', { anchor: 'middle-left', pos: [300, -40], rect_size: [420, 980], color: '#1b2430', alpha: 0.92 });
-desk.text('Board/Title', '지휘석', { size: 28, anchor: 'top-center', pos: [0, -16], rect_size: [360, 40] });
-desk.text('Board/StatusText', '마을 연결 전', { size: 18, anchor: 'top-left', pos: [16, -64], rect_size: [380, 48] });
-desk.text('Board/QuestionText', '질문이 오면 여기에 표시됩니다.', { size: 18, anchor: 'top-left', pos: [16, -120], rect_size: [380, 96] });
-desk.text('Board/ResultText', '', { size: 18, anchor: 'top-left', pos: [16, -220], rect_size: [380, 48] });
-desk.textInput('Board/PairInput', { placeholder: '페어링 코드', anchor: 'top-left', pos: [16, -280], ...field });
-desk.button('Board/PairButton', '연결', { anchor: 'top-left', pos: [16, -332], ...button });
-desk.textInput('Board/GoalInput', { placeholder: '목표', anchor: 'top-left', pos: [16, -392], ...field });
-desk.button('Board/GoalButton', '목표 보내기', { anchor: 'top-left', pos: [16, -444], ...button });
-desk.button('Board/AcceptButton', '이대로 진행', { anchor: 'top-left', pos: [16, -508], ...button });
-desk.button('Board/DenyButton', '거절', { anchor: 'top-left', pos: [16, -564], ...button });
+desk.button('OpenButton', '지휘석', { anchor: 'middle-left', pos: [24, 300], rect_size: [160, 88], ...buttonPaint });
+desk.panel('Board', { anchor: 'middle-left', pos: [24, -96], rect_size: [440, 672], color: '#1b2430', alpha: 0.92, enable: false });
+const deskRows = stack(desk, 'Board', 16, -16, 408);
+deskRows.text('Title', '지휘석', 40);
+deskRows.text('StatusText', '공개 릴레이가 없습니다.', 48);
+deskRows.text('QuestionText', '질문이 오면 여기에 표시됩니다.', 72);
+deskRows.text('ResultText', '', 48);
+deskRows.input('PairInput', '페어링 코드');
+deskRows.button('PairButton', '연결');
+deskRows.input('GoalInput', '목표');
+deskRows.button('GoalButton', '목표 보내기');
+deskRows.pair('AcceptButton', '이대로 진행', 'DenyButton', '거절');
 desk.script('GoalDesk', 'script.GoalDesk', { anchor: 'stretch', pos: [0, 0], rect_size: [1920, 1080] });
 fs.mkdirSync(path.join(outRoot, 'ui'), { recursive: true });
 desk.write(path.join(outRoot, 'ui/AgentMapleDesk.ui'));
 
 const library = new UIBuilder('AgentMapleLibrary');
-library.panel('Board', { anchor: 'middle-right', pos: [-340, -40], rect_size: [460, 1040], color: '#1b2430', alpha: 0.92 });
-library.text('Board/Title', '도서관', { size: 28, anchor: 'top-center', pos: [0, -12], rect_size: [400, 36] });
-library.text('Board/ResultText', 'kn_ 번호로 본문을 엽니다. 출처 기록과 세션 요약은 사실이 아닙니다.', { size: 16, anchor: 'top-left', pos: [16, -56], rect_size: [420, 72] });
-library.textInput('Board/SearchInput', { placeholder: '검색어', anchor: 'top-left', pos: [16, -136], ...field });
-library.button('Board/SearchButton', '검색', { anchor: 'top-left', pos: [16, -184], ...button });
-library.textInput('Board/NodeInput', { placeholder: 'kn_ 번호', anchor: 'top-left', pos: [16, -240], ...field });
-library.button('Board/ReadButton', '본문', { anchor: 'top-left', pos: [16, -288], rect_size: [160, 88], font_size: 18, color: '#111827', bg_color: button.bg_color });
-library.button('Board/NeighborButton', '이웃', { anchor: 'top-left', pos: [188, -288], rect_size: [160, 88], font_size: 18, color: '#111827', bg_color: button.bg_color });
-library.textInput('Board/TitleInput', { placeholder: '제목', anchor: 'top-left', pos: [16, -348], ...field });
-library.textInput('Board/BodyInput', { placeholder: '본문', anchor: 'top-left', pos: [16, -396], ...field });
-library.textInput('Board/SourceInput', { placeholder: '출처 이름', anchor: 'top-left', pos: [16, -444], ...field });
-library.textInput('Board/TaskInput', { placeholder: '과제 id', anchor: 'top-left', pos: [16, -492], ...field });
-library.button('Board/PublishSourceButton', '출처 기록 올리기', { anchor: 'top-left', pos: [16, -544], ...button });
-library.button('Board/PublishSummaryButton', '세션 요약 올리기', { anchor: 'top-left', pos: [16, -596], ...button });
-library.textInput('Board/FromInput', { placeholder: '시작 kn_', anchor: 'top-left', pos: [16, -656], rect_size: [170, 40], font_size: 16 });
-library.textInput('Board/ToInput', { placeholder: '끝 kn_', anchor: 'top-left', pos: [196, -656], rect_size: [170, 40], font_size: 16 });
-library.button('Board/LinkButton', '연결 제안', { anchor: 'top-left', pos: [16, -708], ...button });
-library.textInput('Board/EdgeInput', { placeholder: 'ke_ 번호', anchor: 'top-left', pos: [16, -760], ...field });
-library.button('Board/ApproveButton', '연결 승인', { anchor: 'top-left', pos: [16, -808], ...button });
+library.button('OpenButton', '도서관', { anchor: 'middle-right', pos: [-24, 300], rect_size: [160, 88], ...buttonPaint });
+library.panel('Board', { anchor: 'middle-right', pos: [-24, -140], rect_size: [760, 760], color: '#1b2430', alpha: 0.92, enable: false });
+library.text('Board/Title', '도서관', { size: 28, anchor: 'top-left', pos: [16, -16], rect_size: [728, 40] });
+library.text('Board/ResultText', 'kn_ 번호로 본문을 엽니다. 출처 기록과 세션 요약은 사실이 아닙니다.', { size: 16, anchor: 'top-left', pos: [16, -64], rect_size: [728, 56] });
+const libraryLeft = stack(library, 'Board', 16, -136, 356);
+libraryLeft.input('SearchInput', '검색어');
+libraryLeft.button('SearchButton', '검색');
+libraryLeft.input('NodeInput', 'kn_ 번호');
+libraryLeft.pair('ReadButton', '본문', 'NeighborButton', '이웃');
+libraryLeft.input('TitleInput', '제목');
+libraryLeft.input('BodyInput', '본문');
+libraryLeft.input('SourceInput', '출처 이름');
+const libraryRight = stack(library, 'Board', 388, -136, 356);
+libraryRight.input('TaskInput', '과제 id');
+libraryRight.button('PublishSourceButton', '출처 기록 올리기');
+libraryRight.button('PublishSummaryButton', '세션 요약 올리기');
+libraryRight.input('FromInput', '시작 kn_');
+libraryRight.input('ToInput', '끝 kn_');
+libraryRight.button('LinkButton', '연결 제안');
+libraryRight.input('EdgeInput', 'ke_ 번호');
+libraryRight.button('ApproveButton', '연결 승인');
 library.script('LibraryHall', 'script.LibraryHall', { anchor: 'stretch', pos: [0, 0], rect_size: [1920, 1080] });
 library.write(path.join(outRoot, 'ui/AgentMapleLibrary.ui'));
 

@@ -1,7 +1,7 @@
 {
   "Id": "",
   "GameId": "",
-  "EntryKey": "ui://6495d8da-3444-4b3d-b30c-d757acf7647f",
+  "EntryKey": "ui://be7e7c56-fff2-4992-b3b5-b9e052f42052",
   "ContentType": "x-mod/ui",
   "Content": "",
   "Usage": 0,
@@ -14,7 +14,7 @@
     "Use": "Binary",
     "Entities": [
       {
-        "id": "6495d8da-3444-4b3d-b30c-d757acf7647f",
+        "id": "be7e7c56-fff2-4992-b3b5-b9e052f42052",
         "path": "/ui/AgentMapleLibrary",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.UIGroupComponent,MOD.Core.CanvasGroupComponent",
         "jsonString": {
@@ -113,17 +113,260 @@
         }
       },
       {
-        "id": "dda88d18-51a1-4da2-b82c-8cfd06a2c1b3",
+        "id": "b50bed46-6eef-4a3c-bd51-68b548cee026",
+        "path": "/ui/AgentMapleLibrary/OpenButton",
+        "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.ButtonComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.UITouchReceiveComponent",
+        "jsonString": {
+          "name": "OpenButton",
+          "path": "/ui/AgentMapleLibrary/OpenButton",
+          "nameEditable": true,
+          "enable": true,
+          "visible": true,
+          "localize": true,
+          "displayOrder": 0,
+          "pathConstraints": "///",
+          "revision": 0,
+          "origin": {
+            "type": "Model",
+            "entry_id": "UIButton",
+            "sub_entity_id": null,
+            "root_entity_id": null,
+            "replaced_model_id": null
+          },
+          "modelId": "uibutton",
+          "@components": [
+            {
+              "@type": "MOD.Core.UITransformComponent",
+              "ActivePlatform": 255,
+              "AlignmentOption": 2,
+              "AnchorsMax": {
+                "x": 1,
+                "y": 0.5
+              },
+              "AnchorsMin": {
+                "x": 1,
+                "y": 0.5
+              },
+              "MobileOnly": false,
+              "OffsetMax": {
+                "x": -24,
+                "y": 344
+              },
+              "OffsetMin": {
+                "x": -184,
+                "y": 256
+              },
+              "Pivot": {
+                "x": 1,
+                "y": 0.5
+              },
+              "RectSize": {
+                "x": 160,
+                "y": 88
+              },
+              "UIMode": 1,
+              "UIScale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              },
+              "UIVersion": 2,
+              "anchoredPosition": {
+                "x": -24,
+                "y": 300
+              },
+              "Position": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "QuaternionRotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0,
+                "w": 1
+              },
+              "Scale": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+              },
+              "Enable": true
+            },
+            {
+              "@type": "MOD.Core.SpriteGUIRendererComponent",
+              "AnimClipPlayType": 0,
+              "EndFrameIndex": 2147483647,
+              "ImageRUID": {
+                "DataId": "2860136c06ab075439721c027de365af"
+              },
+              "IgnoreMapLayerCheck": false,
+              "LocalPosition": {
+                "x": 0,
+                "y": 0
+              },
+              "LocalScale": {
+                "x": 1,
+                "y": 1
+              },
+              "MaterialId": "",
+              "OrderInLayer": 0,
+              "OverrideSorting": false,
+              "PlayRate": 1,
+              "PreserveSprite": 0,
+              "SortingLayer": "UI",
+              "StartFrameIndex": 0,
+              "Color": {
+                "r": 0.9,
+                "g": 0.94,
+                "b": 1,
+                "a": 1
+              },
+              "DropShadow": false,
+              "DropShadowAngle": 120,
+              "DropShadowColor": {
+                "r": 0,
+                "g": 0,
+                "b": 0,
+                "a": 0.72
+              },
+              "DropShadowDistance": 3,
+              "FillAmount": 1,
+              "FillCenter": true,
+              "FillClockWise": true,
+              "FillMethod": 0,
+              "FillOrigin": 0,
+              "FlipX": false,
+              "FlipY": false,
+              "FrameColumn": 1,
+              "FrameRate": 0,
+              "FrameRow": 1,
+              "Outline": false,
+              "OutlineColor": {
+                "r": 0,
+                "g": 0,
+                "b": 0,
+                "a": 1
+              },
+              "OutlineWidth": 3,
+              "RaycastTarget": true,
+              "Type": 1,
+              "Enable": true
+            },
+            {
+              "@type": "MOD.Core.ButtonComponent",
+              "Colors": {
+                "NormalColor": {
+                  "r": 1,
+                  "g": 1,
+                  "b": 1,
+                  "a": 1
+                },
+                "HighlightedColor": {
+                  "r": 0.9607843,
+                  "g": 0.9607843,
+                  "b": 0.9607843,
+                  "a": 1
+                },
+                "PressedColor": {
+                  "r": 0.784313738,
+                  "g": 0.784313738,
+                  "b": 0.784313738,
+                  "a": 1
+                },
+                "SelectedColor": {
+                  "r": 0.9607843,
+                  "g": 0.9607843,
+                  "b": 0.9607843,
+                  "a": 1
+                },
+                "DisabledColor": {
+                  "r": 0.784313738,
+                  "g": 0.784313738,
+                  "b": 0.784313738,
+                  "a": 0.5019608
+                },
+                "ColorMultiplier": 1,
+                "FadeDuration": 0.1
+              },
+              "IgnoreMapLayerCheck": false,
+              "ImageRUIDs": {
+                "HighlightedSprite": null,
+                "PressedSprite": null,
+                "SelectedSprite": null,
+                "DisabledSprite": null
+              },
+              "KeyCode": 0,
+              "OrderInLayer": 0,
+              "OverrideSorting": false,
+              "SortingLayer": "UI",
+              "Transition": 1,
+              "Enable": true
+            },
+            {
+              "@type": "MOD.Core.TextGUIRendererComponent",
+              "BestFit": false,
+              "ConstraintX": 100,
+              "ConstraintY": 100,
+              "FaceDilate": 0,
+              "Font": "Default",
+              "FontColor": {
+                "r": 0.06666666666666667,
+                "g": 0.09411764705882353,
+                "b": 0.15294117647058825,
+                "a": 1
+              },
+              "FontSize": 18,
+              "FontStyle": 0,
+              "HorizontalAlignment": 2,
+              "IgnoreMapLayerCheck": false,
+              "MaxSize": 40,
+              "MinSize": 10,
+              "OrderInLayer": 0,
+              "OutlineColor": {
+                "r": 0,
+                "g": 0,
+                "b": 0,
+                "a": 1
+              },
+              "OutlineWidth": 0,
+              "Overflow": 0,
+              "OverrideSorting": false,
+              "Padding": {
+                "left": 0,
+                "right": 0,
+                "top": 0,
+                "bottom": 0
+              },
+              "SizeFit": false,
+              "SortingLayer": "UI",
+              "Text": "도서관",
+              "Underlay": false,
+              "UseConstraintX": false,
+              "UseConstraintY": false,
+              "VerticalAlignment": 512,
+              "Enable": true
+            },
+            {
+              "@type": "MOD.Core.UITouchReceiveComponent",
+              "Enable": true
+            }
+          ],
+          "@version": 1
+        }
+      },
+      {
+        "id": "650b43ee-a047-4762-8238-19f8d0fc011b",
         "path": "/ui/AgentMapleLibrary/Board",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent",
         "jsonString": {
           "name": "Board",
           "path": "/ui/AgentMapleLibrary/Board",
           "nameEditable": true,
-          "enable": true,
+          "enable": false,
           "visible": true,
           "localize": true,
-          "displayOrder": 0,
+          "displayOrder": 1,
           "pathConstraints": "///",
           "revision": 0,
           "origin": {
@@ -149,20 +392,20 @@
               },
               "MobileOnly": false,
               "OffsetMax": {
-                "x": -340,
-                "y": 480
+                "x": -24,
+                "y": 240
               },
               "OffsetMin": {
-                "x": -800,
-                "y": -560
+                "x": -784,
+                "y": -520
               },
               "Pivot": {
                 "x": 1,
                 "y": 0.5
               },
               "RectSize": {
-                "x": 460,
-                "y": 1040
+                "x": 760,
+                "y": 760
               },
               "UIMode": 1,
               "UIScale": {
@@ -172,8 +415,8 @@
               },
               "UIVersion": 2,
               "anchoredPosition": {
-                "x": -340,
-                "y": -40
+                "x": -24,
+                "y": -140
               },
               "Position": {
                 "x": 0,
@@ -258,7 +501,7 @@
         }
       },
       {
-        "id": "b2199a95-8ee7-4136-a22d-6c1f000cf96e",
+        "id": "b4b8f632-0f30-4385-ad25-7be65a26a666",
         "path": "/ui/AgentMapleLibrary/Board/Title",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent",
         "jsonString": {
@@ -283,31 +526,31 @@
             {
               "@type": "MOD.Core.UITransformComponent",
               "ActivePlatform": 255,
-              "AlignmentOption": 3,
+              "AlignmentOption": 4,
               "AnchorsMax": {
-                "x": 0.5,
+                "x": 0,
                 "y": 1
               },
               "AnchorsMin": {
-                "x": 0.5,
+                "x": 0,
                 "y": 1
               },
               "MobileOnly": false,
               "OffsetMax": {
-                "x": 200,
-                "y": -12
+                "x": 744,
+                "y": -16
               },
               "OffsetMin": {
-                "x": -200,
-                "y": -48
+                "x": 16,
+                "y": -56
               },
               "Pivot": {
-                "x": 0.5,
+                "x": 0,
                 "y": 1
               },
               "RectSize": {
-                "x": 400,
-                "y": 36
+                "x": 728,
+                "y": 40
               },
               "UIMode": 1,
               "UIScale": {
@@ -317,8 +560,8 @@
               },
               "UIVersion": 2,
               "anchoredPosition": {
-                "x": 0,
-                "y": -12
+                "x": 16,
+                "y": -16
               },
               "Position": {
                 "x": 0,
@@ -447,7 +690,7 @@
         }
       },
       {
-        "id": "8a45dcf1-d084-48b9-a9a5-1869f4dfae0e",
+        "id": "be5d6b5d-425a-45d8-a43f-9c52bf82a454",
         "path": "/ui/AgentMapleLibrary/Board/ResultText",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent",
         "jsonString": {
@@ -483,20 +726,20 @@
               },
               "MobileOnly": false,
               "OffsetMax": {
-                "x": 436,
-                "y": -56
+                "x": 744,
+                "y": -64
               },
               "OffsetMin": {
                 "x": 16,
-                "y": -128
+                "y": -120
               },
               "Pivot": {
                 "x": 0,
                 "y": 1
               },
               "RectSize": {
-                "x": 420,
-                "y": 72
+                "x": 728,
+                "y": 56
               },
               "UIMode": 1,
               "UIScale": {
@@ -507,7 +750,7 @@
               "UIVersion": 2,
               "anchoredPosition": {
                 "x": 16,
-                "y": -56
+                "y": -64
               },
               "Position": {
                 "x": 0,
@@ -636,7 +879,7 @@
         }
       },
       {
-        "id": "8bd357ba-83e7-4b70-a546-f8d25eed2058",
+        "id": "e80adbb9-73b3-4bf2-97b6-18ffec076867",
         "path": "/ui/AgentMapleLibrary/Board/SearchInput",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.TextGUIRendererInputComponent",
         "jsonString": {
@@ -672,20 +915,20 @@
               },
               "MobileOnly": false,
               "OffsetMax": {
-                "x": 376,
+                "x": 372,
                 "y": -136
               },
               "OffsetMin": {
                 "x": 16,
-                "y": -176
+                "y": -184
               },
               "Pivot": {
                 "x": 0,
                 "y": 1
               },
               "RectSize": {
-                "x": 360,
-                "y": 40
+                "x": 356,
+                "y": 48
               },
               "UIMode": 1,
               "UIScale": {
@@ -847,7 +1090,7 @@
         }
       },
       {
-        "id": "12b368ab-f205-49a1-b10b-80bdbe3fbe1a",
+        "id": "84e2cbef-a65c-431c-94b3-080dc0667b05",
         "path": "/ui/AgentMapleLibrary/Board/SearchButton",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.ButtonComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.UITouchReceiveComponent",
         "jsonString": {
@@ -883,19 +1126,19 @@
               },
               "MobileOnly": false,
               "OffsetMax": {
-                "x": 236,
-                "y": -184
+                "x": 372,
+                "y": -192
               },
               "OffsetMin": {
                 "x": 16,
-                "y": -272
+                "y": -280
               },
               "Pivot": {
                 "x": 0,
                 "y": 1
               },
               "RectSize": {
-                "x": 220,
+                "x": 356,
                 "y": 88
               },
               "UIMode": 1,
@@ -907,7 +1150,7 @@
               "UIVersion": 2,
               "anchoredPosition": {
                 "x": 16,
-                "y": -184
+                "y": -192
               },
               "Position": {
                 "x": 0,
@@ -1090,7 +1333,7 @@
         }
       },
       {
-        "id": "46f3d4d1-7abb-4a4c-8076-a4d37592eda7",
+        "id": "3eb8cf47-c653-4d88-a4a7-ee0340b9e602",
         "path": "/ui/AgentMapleLibrary/Board/NodeInput",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.TextGUIRendererInputComponent",
         "jsonString": {
@@ -1126,20 +1369,20 @@
               },
               "MobileOnly": false,
               "OffsetMax": {
-                "x": 376,
-                "y": -240
+                "x": 372,
+                "y": -288
               },
               "OffsetMin": {
                 "x": 16,
-                "y": -280
+                "y": -336
               },
               "Pivot": {
                 "x": 0,
                 "y": 1
               },
               "RectSize": {
-                "x": 360,
-                "y": 40
+                "x": 356,
+                "y": 48
               },
               "UIMode": 1,
               "UIScale": {
@@ -1150,7 +1393,7 @@
               "UIVersion": 2,
               "anchoredPosition": {
                 "x": 16,
-                "y": -240
+                "y": -288
               },
               "Position": {
                 "x": 0,
@@ -1301,7 +1544,7 @@
         }
       },
       {
-        "id": "1099a572-14ee-4eda-8058-cde6a45e2639",
+        "id": "ef7b7af0-c931-45e7-8a68-e724f495ad26",
         "path": "/ui/AgentMapleLibrary/Board/ReadButton",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.ButtonComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.UITouchReceiveComponent",
         "jsonString": {
@@ -1337,19 +1580,19 @@
               },
               "MobileOnly": false,
               "OffsetMax": {
-                "x": 176,
-                "y": -288
+                "x": 188,
+                "y": -344
               },
               "OffsetMin": {
                 "x": 16,
-                "y": -376
+                "y": -432
               },
               "Pivot": {
                 "x": 0,
                 "y": 1
               },
               "RectSize": {
-                "x": 160,
+                "x": 172,
                 "y": 88
               },
               "UIMode": 1,
@@ -1361,7 +1604,7 @@
               "UIVersion": 2,
               "anchoredPosition": {
                 "x": 16,
-                "y": -288
+                "y": -344
               },
               "Position": {
                 "x": 0,
@@ -1544,7 +1787,7 @@
         }
       },
       {
-        "id": "8290e252-6e74-415b-a290-e713d64ae259",
+        "id": "583674b4-c658-4da2-99c8-0192125fb414",
         "path": "/ui/AgentMapleLibrary/Board/NeighborButton",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.ButtonComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.UITouchReceiveComponent",
         "jsonString": {
@@ -1580,19 +1823,19 @@
               },
               "MobileOnly": false,
               "OffsetMax": {
-                "x": 348,
-                "y": -288
+                "x": 372,
+                "y": -344
               },
               "OffsetMin": {
-                "x": 188,
-                "y": -376
+                "x": 200,
+                "y": -432
               },
               "Pivot": {
                 "x": 0,
                 "y": 1
               },
               "RectSize": {
-                "x": 160,
+                "x": 172,
                 "y": 88
               },
               "UIMode": 1,
@@ -1603,8 +1846,8 @@
               },
               "UIVersion": 2,
               "anchoredPosition": {
-                "x": 188,
-                "y": -288
+                "x": 200,
+                "y": -344
               },
               "Position": {
                 "x": 0,
@@ -1787,7 +2030,7 @@
         }
       },
       {
-        "id": "653446a9-4e7a-48a5-a24d-66f549d65323",
+        "id": "dc3d2296-5eae-4dea-989c-cee12290a341",
         "path": "/ui/AgentMapleLibrary/Board/TitleInput",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.TextGUIRendererInputComponent",
         "jsonString": {
@@ -1823,20 +2066,20 @@
               },
               "MobileOnly": false,
               "OffsetMax": {
-                "x": 376,
-                "y": -348
+                "x": 372,
+                "y": -440
               },
               "OffsetMin": {
                 "x": 16,
-                "y": -388
+                "y": -488
               },
               "Pivot": {
                 "x": 0,
                 "y": 1
               },
               "RectSize": {
-                "x": 360,
-                "y": 40
+                "x": 356,
+                "y": 48
               },
               "UIMode": 1,
               "UIScale": {
@@ -1847,7 +2090,7 @@
               "UIVersion": 2,
               "anchoredPosition": {
                 "x": 16,
-                "y": -348
+                "y": -440
               },
               "Position": {
                 "x": 0,
@@ -1998,7 +2241,7 @@
         }
       },
       {
-        "id": "4ebffaf4-232e-47b9-b6bf-f31909a11596",
+        "id": "e01b8398-7c0c-460e-b290-397e1ecb62d9",
         "path": "/ui/AgentMapleLibrary/Board/BodyInput",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.TextGUIRendererInputComponent",
         "jsonString": {
@@ -2034,20 +2277,20 @@
               },
               "MobileOnly": false,
               "OffsetMax": {
-                "x": 376,
-                "y": -396
+                "x": 372,
+                "y": -496
               },
               "OffsetMin": {
                 "x": 16,
-                "y": -436
+                "y": -544
               },
               "Pivot": {
                 "x": 0,
                 "y": 1
               },
               "RectSize": {
-                "x": 360,
-                "y": 40
+                "x": 356,
+                "y": 48
               },
               "UIMode": 1,
               "UIScale": {
@@ -2058,7 +2301,7 @@
               "UIVersion": 2,
               "anchoredPosition": {
                 "x": 16,
-                "y": -396
+                "y": -496
               },
               "Position": {
                 "x": 0,
@@ -2209,7 +2452,7 @@
         }
       },
       {
-        "id": "8629578a-ccda-43f9-9130-b0821582ab7b",
+        "id": "28bf5af0-0362-4d36-9416-08bc088e909d",
         "path": "/ui/AgentMapleLibrary/Board/SourceInput",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.TextGUIRendererInputComponent",
         "jsonString": {
@@ -2245,20 +2488,20 @@
               },
               "MobileOnly": false,
               "OffsetMax": {
-                "x": 376,
-                "y": -444
+                "x": 372,
+                "y": -552
               },
               "OffsetMin": {
                 "x": 16,
-                "y": -484
+                "y": -600
               },
               "Pivot": {
                 "x": 0,
                 "y": 1
               },
               "RectSize": {
-                "x": 360,
-                "y": 40
+                "x": 356,
+                "y": 48
               },
               "UIMode": 1,
               "UIScale": {
@@ -2269,7 +2512,7 @@
               "UIVersion": 2,
               "anchoredPosition": {
                 "x": 16,
-                "y": -444
+                "y": -552
               },
               "Position": {
                 "x": 0,
@@ -2420,7 +2663,7 @@
         }
       },
       {
-        "id": "035bfa75-a62b-4221-b4cf-af06e3f7a71f",
+        "id": "43641824-fd00-4b2a-beab-8780b24f8d27",
         "path": "/ui/AgentMapleLibrary/Board/TaskInput",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.TextGUIRendererInputComponent",
         "jsonString": {
@@ -2456,20 +2699,20 @@
               },
               "MobileOnly": false,
               "OffsetMax": {
-                "x": 376,
-                "y": -492
+                "x": 744,
+                "y": -136
               },
               "OffsetMin": {
-                "x": 16,
-                "y": -532
+                "x": 388,
+                "y": -184
               },
               "Pivot": {
                 "x": 0,
                 "y": 1
               },
               "RectSize": {
-                "x": 360,
-                "y": 40
+                "x": 356,
+                "y": 48
               },
               "UIMode": 1,
               "UIScale": {
@@ -2479,8 +2722,8 @@
               },
               "UIVersion": 2,
               "anchoredPosition": {
-                "x": 16,
-                "y": -492
+                "x": 388,
+                "y": -136
               },
               "Position": {
                 "x": 0,
@@ -2631,7 +2874,7 @@
         }
       },
       {
-        "id": "33489400-2019-47c5-8969-1da0d4675e05",
+        "id": "44f49c47-cc3d-4a74-b330-e06438ace70d",
         "path": "/ui/AgentMapleLibrary/Board/PublishSourceButton",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.ButtonComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.UITouchReceiveComponent",
         "jsonString": {
@@ -2667,19 +2910,19 @@
               },
               "MobileOnly": false,
               "OffsetMax": {
-                "x": 236,
-                "y": -544
+                "x": 744,
+                "y": -192
               },
               "OffsetMin": {
-                "x": 16,
-                "y": -632
+                "x": 388,
+                "y": -280
               },
               "Pivot": {
                 "x": 0,
                 "y": 1
               },
               "RectSize": {
-                "x": 220,
+                "x": 356,
                 "y": 88
               },
               "UIMode": 1,
@@ -2690,8 +2933,8 @@
               },
               "UIVersion": 2,
               "anchoredPosition": {
-                "x": 16,
-                "y": -544
+                "x": 388,
+                "y": -192
               },
               "Position": {
                 "x": 0,
@@ -2874,7 +3117,7 @@
         }
       },
       {
-        "id": "acd3cbf8-a24e-450b-b4cf-6e2799d5fbef",
+        "id": "71ac70f1-27c1-411a-80a9-97f01288b027",
         "path": "/ui/AgentMapleLibrary/Board/PublishSummaryButton",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.ButtonComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.UITouchReceiveComponent",
         "jsonString": {
@@ -2910,19 +3153,19 @@
               },
               "MobileOnly": false,
               "OffsetMax": {
-                "x": 236,
-                "y": -596
+                "x": 744,
+                "y": -288
               },
               "OffsetMin": {
-                "x": 16,
-                "y": -684
+                "x": 388,
+                "y": -376
               },
               "Pivot": {
                 "x": 0,
                 "y": 1
               },
               "RectSize": {
-                "x": 220,
+                "x": 356,
                 "y": 88
               },
               "UIMode": 1,
@@ -2933,8 +3176,8 @@
               },
               "UIVersion": 2,
               "anchoredPosition": {
-                "x": 16,
-                "y": -596
+                "x": 388,
+                "y": -288
               },
               "Position": {
                 "x": 0,
@@ -3117,7 +3360,7 @@
         }
       },
       {
-        "id": "97364abb-42fb-48f2-87ef-ea6a85e31c44",
+        "id": "5f95d4d2-192c-4987-a11f-880337ed2b62",
         "path": "/ui/AgentMapleLibrary/Board/FromInput",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.TextGUIRendererInputComponent",
         "jsonString": {
@@ -3153,20 +3396,20 @@
               },
               "MobileOnly": false,
               "OffsetMax": {
-                "x": 186,
-                "y": -656
+                "x": 744,
+                "y": -384
               },
               "OffsetMin": {
-                "x": 16,
-                "y": -696
+                "x": 388,
+                "y": -432
               },
               "Pivot": {
                 "x": 0,
                 "y": 1
               },
               "RectSize": {
-                "x": 170,
-                "y": 40
+                "x": 356,
+                "y": 48
               },
               "UIMode": 1,
               "UIScale": {
@@ -3176,8 +3419,8 @@
               },
               "UIVersion": 2,
               "anchoredPosition": {
-                "x": 16,
-                "y": -656
+                "x": 388,
+                "y": -384
               },
               "Position": {
                 "x": 0,
@@ -3270,7 +3513,7 @@
                 "b": 1,
                 "a": 1
               },
-              "FontSize": 16,
+              "FontSize": 18,
               "FontStyle": 0,
               "HorizontalAlignment": 2,
               "IgnoreMapLayerCheck": false,
@@ -3328,7 +3571,7 @@
         }
       },
       {
-        "id": "de8ed1eb-477f-4d85-a3f2-b53ff654af16",
+        "id": "b58693a0-4692-4c73-851c-ad01bd6ef68d",
         "path": "/ui/AgentMapleLibrary/Board/ToInput",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.TextGUIRendererInputComponent",
         "jsonString": {
@@ -3364,20 +3607,20 @@
               },
               "MobileOnly": false,
               "OffsetMax": {
-                "x": 366,
-                "y": -656
+                "x": 744,
+                "y": -440
               },
               "OffsetMin": {
-                "x": 196,
-                "y": -696
+                "x": 388,
+                "y": -488
               },
               "Pivot": {
                 "x": 0,
                 "y": 1
               },
               "RectSize": {
-                "x": 170,
-                "y": 40
+                "x": 356,
+                "y": 48
               },
               "UIMode": 1,
               "UIScale": {
@@ -3387,8 +3630,8 @@
               },
               "UIVersion": 2,
               "anchoredPosition": {
-                "x": 196,
-                "y": -656
+                "x": 388,
+                "y": -440
               },
               "Position": {
                 "x": 0,
@@ -3481,7 +3724,7 @@
                 "b": 1,
                 "a": 1
               },
-              "FontSize": 16,
+              "FontSize": 18,
               "FontStyle": 0,
               "HorizontalAlignment": 2,
               "IgnoreMapLayerCheck": false,
@@ -3539,7 +3782,7 @@
         }
       },
       {
-        "id": "3f037da1-4985-462a-a823-55b3ae3937bf",
+        "id": "b375272c-fac7-4b89-8bc9-81cf9af6b708",
         "path": "/ui/AgentMapleLibrary/Board/LinkButton",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.ButtonComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.UITouchReceiveComponent",
         "jsonString": {
@@ -3575,19 +3818,19 @@
               },
               "MobileOnly": false,
               "OffsetMax": {
-                "x": 236,
-                "y": -708
+                "x": 744,
+                "y": -496
               },
               "OffsetMin": {
-                "x": 16,
-                "y": -796
+                "x": 388,
+                "y": -584
               },
               "Pivot": {
                 "x": 0,
                 "y": 1
               },
               "RectSize": {
-                "x": 220,
+                "x": 356,
                 "y": 88
               },
               "UIMode": 1,
@@ -3598,8 +3841,8 @@
               },
               "UIVersion": 2,
               "anchoredPosition": {
-                "x": 16,
-                "y": -708
+                "x": 388,
+                "y": -496
               },
               "Position": {
                 "x": 0,
@@ -3782,7 +4025,7 @@
         }
       },
       {
-        "id": "dd8b8bc5-8ca8-462f-b652-10e24ae00313",
+        "id": "6d13bbf1-891c-4cad-8ceb-793cd5727d83",
         "path": "/ui/AgentMapleLibrary/Board/EdgeInput",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.TextGUIRendererInputComponent",
         "jsonString": {
@@ -3818,20 +4061,20 @@
               },
               "MobileOnly": false,
               "OffsetMax": {
-                "x": 376,
-                "y": -760
+                "x": 744,
+                "y": -592
               },
               "OffsetMin": {
-                "x": 16,
-                "y": -800
+                "x": 388,
+                "y": -640
               },
               "Pivot": {
                 "x": 0,
                 "y": 1
               },
               "RectSize": {
-                "x": 360,
-                "y": 40
+                "x": 356,
+                "y": 48
               },
               "UIMode": 1,
               "UIScale": {
@@ -3841,8 +4084,8 @@
               },
               "UIVersion": 2,
               "anchoredPosition": {
-                "x": 16,
-                "y": -760
+                "x": 388,
+                "y": -592
               },
               "Position": {
                 "x": 0,
@@ -3993,7 +4236,7 @@
         }
       },
       {
-        "id": "8376e788-967e-4e56-8bda-83cc8a2346c8",
+        "id": "e9742c13-327a-4122-8dc5-7d0cd408adea",
         "path": "/ui/AgentMapleLibrary/Board/ApproveButton",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.ButtonComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.UITouchReceiveComponent",
         "jsonString": {
@@ -4029,19 +4272,19 @@
               },
               "MobileOnly": false,
               "OffsetMax": {
-                "x": 236,
-                "y": -808
+                "x": 744,
+                "y": -648
               },
               "OffsetMin": {
-                "x": 16,
-                "y": -896
+                "x": 388,
+                "y": -736
               },
               "Pivot": {
                 "x": 0,
                 "y": 1
               },
               "RectSize": {
-                "x": 220,
+                "x": 356,
                 "y": 88
               },
               "UIMode": 1,
@@ -4052,8 +4295,8 @@
               },
               "UIVersion": 2,
               "anchoredPosition": {
-                "x": 16,
-                "y": -808
+                "x": 388,
+                "y": -648
               },
               "Position": {
                 "x": 0,
@@ -4236,7 +4479,7 @@
         }
       },
       {
-        "id": "d0eb4814-b571-4f59-91fa-5f21601b01a7",
+        "id": "00e322e0-f4b4-4b5b-b53d-93c3c4537522",
         "path": "/ui/AgentMapleLibrary/LibraryHall",
         "componentNames": "MOD.Core.UITransformComponent,script.LibraryHall",
         "jsonString": {
@@ -4246,7 +4489,7 @@
           "enable": true,
           "visible": true,
           "localize": true,
-          "displayOrder": 1,
+          "displayOrder": 2,
           "pathConstraints": "///",
           "revision": 0,
           "origin": {

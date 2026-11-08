@@ -18,10 +18,40 @@ script LibraryHall extends Component
 	property string ToInputPath = "/ui/AgentMapleLibrary/ToInput"
 	property string EdgeInputPath = "/ui/AgentMapleLibrary/EdgeInput"
 	property string ResultTextPath = "/ui/AgentMapleLibrary/ResultText"
+	property string BoardPath = "/ui/AgentMapleLibrary/Board"
+	property string OtherBoardPath = "/ui/AgentMapleDesk/Board"
 
 	@ExecSpace("ClientOnly")
 	method void OnBeginPlay()
+		self:SetEnabled(self.BoardPath, false)
 		self:WriteText(self.ResultTextPath, "도서관. kn_ 번호로 본문을 엽니다. 출처 기록과 세션 요약은 사실이 아닙니다.")
+	end
+
+	@ExecSpace("ClientOnly")
+	method void ToggleBoard()
+		local board = _EntityService:GetEntityByPath(self.BoardPath)
+		if board == nil then
+			return
+		end
+		local open = board.Enable ~= true
+		self:SetEnabled(self.BoardPath, open)
+		if open == true then
+			self:SetEnabled(self.OtherBoardPath, false)
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void SetEnabled(string entityPath, boolean enabled)
+		local entity = _EntityService:GetEntityByPath(entityPath)
+		if entity ~= nil then
+			entity.Enable = enabled
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	@EventSender("Entity", "/ui/AgentMapleLibrary/OpenButton")
+	handler HandleOpenButton(ButtonClickEvent event)
+		self:ToggleBoard()
 	end
 
 	@ExecSpace("ClientOnly")
@@ -85,36 +115,43 @@ script LibraryHall extends Component
 		end
 	end
 
+	@ExecSpace("ClientOnly")
 	@EventSender("Entity", "/ui/AgentMapleLibrary/SearchButton")
 	handler HandleLibrarySearch(ButtonClickEvent event)
 		self:OnSearch()
 	end
 
+	@ExecSpace("ClientOnly")
 	@EventSender("Entity", "/ui/AgentMapleLibrary/ReadButton")
 	handler HandleLibraryRead(ButtonClickEvent event)
 		self:OnRead()
 	end
 
+	@ExecSpace("ClientOnly")
 	@EventSender("Entity", "/ui/AgentMapleLibrary/NeighborButton")
 	handler HandleLibraryNeighbors(ButtonClickEvent event)
 		self:OnNeighbors()
 	end
 
+	@ExecSpace("ClientOnly")
 	@EventSender("Entity", "/ui/AgentMapleLibrary/PublishSourceButton")
 	handler HandlePublishSource(ButtonClickEvent event)
 		self:OnPublishSource()
 	end
 
+	@ExecSpace("ClientOnly")
 	@EventSender("Entity", "/ui/AgentMapleLibrary/PublishSummaryButton")
 	handler HandlePublishSummary(ButtonClickEvent event)
 		self:OnPublishSummary()
 	end
 
+	@ExecSpace("ClientOnly")
 	@EventSender("Entity", "/ui/AgentMapleLibrary/LinkButton")
 	handler HandleLibraryLink(ButtonClickEvent event)
 		self:OnLink()
 	end
 
+	@ExecSpace("ClientOnly")
 	@EventSender("Entity", "/ui/AgentMapleLibrary/ApproveButton")
 	handler HandleLibraryApprove(ButtonClickEvent event)
 		self:OnApprove()

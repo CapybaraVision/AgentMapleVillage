@@ -44,4 +44,22 @@ describe('msw script contract', () => {
     expect(code).not.toMatch(/WebSocket|websocket|os\.execute|io\.popen|RequestAndWait|RUID|\.modpackage/);
     expect(all).toContain('UNVERIFIED');
   });
+
+  it('declares every assigned component field, which static tests can check and Creator play cannot be claimed here', () => {
+    const required = ['WorldToken', 'ClockOffset', 'OpenDecisionId', 'Busy', 'Cursor', 'CommandCounter'];
+    for (const file of files) {
+      const text = fs.readFileSync(path.join(root, file), 'utf8');
+      const declared = new Set([...text.matchAll(/^\s*property\s+\S+\s+([A-Za-z_][A-Za-z0-9_]*)/gm)].map((match) => match[1]));
+      const assigned = [...text.matchAll(/\bself\.([A-Za-z_][A-Za-z0-9_]*)\s*=/g)].map((match) => match[1]);
+      for (const name of assigned) expect(declared.has(name), `${file} ${name}`).toBe(true);
+      if (file === 'VillageRelay.mlua') {
+        for (const name of required) expect(declared.has(name)).toBe(true);
+        expect(text).not.toMatch(/^\s*@Sync\b/m);
+        expect(text).toContain('cannot set Name, no such field');
+      }
+    }
+    const desk = fs.readFileSync(path.join(root, 'GoalDesk.mlua'), 'utf8');
+    expect(desk).toContain('공개 릴레이가 없습니다.');
+    expect(desk).not.toContain('마을 연결 전');
+  });
 });

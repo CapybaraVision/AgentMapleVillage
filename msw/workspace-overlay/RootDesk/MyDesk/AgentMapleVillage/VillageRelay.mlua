@@ -19,9 +19,17 @@ script VillageRelay extends Component
 	property string WorkerActorId = "npc-worker"
 	property string ForemanSessionId = "ses_foreman"
 	property string WorkerSessionId = "ses_worker"
+	-- Assigned fields must be declared. The official UI runtime note says an undeclared
+	-- self.Name assignment raises "cannot set Name, no such field" and stops the method.
+	-- These are not @Sync. OnBeginPlay clears the token so a saved map does not keep it.
+	property string WorldToken = ""
+	property any ClockOffset = nil
+	property string OpenDecisionId = ""
+	property boolean Busy = false
+	property number Cursor = 0
+	property number CommandCounter = 0
 	@ExecSpace("ServerOnly")
 	method void OnBeginPlay()
-		-- Runtime fields, not properties, so a map save does not keep the world token.
 		self.WorldToken = ""
 		self.ClockOffset = nil
 		self.OpenDecisionId = ""
