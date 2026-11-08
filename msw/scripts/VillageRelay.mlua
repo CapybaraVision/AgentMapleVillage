@@ -19,9 +19,12 @@ script VillageRelay extends Component
 	property string WorkerActorId = "npc-worker"
 	property string ForemanSessionId = "ses_foreman"
 	property string WorkerSessionId = "ses_worker"
-	-- Assigned fields must be declared. The official UI runtime note says an undeclared
-	-- self.Name assignment raises "cannot set Name, no such field" and stops the method.
-	-- These are not @Sync. OnBeginPlay clears the token so a saved map does not keep it.
+	property string NoticePath = "/maps/AgentMapleVillage/NoticeBoard"
+	property string BookWorkPath = "/maps/AgentMapleVillage/BookWork"
+	property string BookSourcePath = "/maps/AgentMapleVillage/BookSource"
+	-- Our relay bearer. Not the unverified HttpService.WorldToken builtin.
+	-- Declared because an undeclared self field raises "cannot set Name, no such field".
+	-- Not @Sync. OnBeginPlay clears it so a saved map does not keep the token.
 	property string WorldToken = ""
 	property any ClockOffset = nil
 	property string OpenDecisionId = ""
@@ -201,6 +204,64 @@ script VillageRelay extends Component
 		if view.library ~= nil and view.library.panel ~= nil and view.library.panel.text ~= nil then
 			self:PushLibrary(view.library.panel.text)
 		end
+		if view.library ~= nil and view.library.nodes ~= nil then
+			self:PaintBooks(view.library.nodes)
+		end
+		if view.feed ~= nil then
+			self:PaintNotice(view.feed)
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void PaintBooks(table nodes)
+		local workId = ""
+		local workTitle = "빈 작업 책"
+		local sourceId = ""
+		local sourceTitle = "빈 출처 책"
+		for i = 1, #nodes do
+			local node = nodes[i]
+			if node ~= nil and node.kind == "summary" and workId == "" and node.id ~= nil then
+				workId = node.id
+				workTitle = node.title or workTitle
+			end
+			if node ~= nil and node.kind == "source" and sourceId == "" and node.id ~= nil then
+				sourceId = node.id
+				sourceTitle = node.title or sourceTitle
+			end
+		end
+		self:BindBook(self.BookWorkPath, workId, workTitle)
+		self:BindBook(self.BookSourcePath, sourceId, sourceTitle)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void BindBook(string path, string nodeId, string title)
+		local book = _EntityService:GetEntityByPath(path)
+		if book ~= nil and book.BookSpot ~= nil then
+			book.BookSpot:Bind(nodeId, title)
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void PaintNotice(table feed)
+		local lines = ""
+		local count = 0
+		local index = #feed
+		while index >= 1 and count < 4 do
+			local item = feed[index]
+			if item ~= nil and (item.kind == "goal" or item.kind == "decision" or item.kind == "system") and item.text ~= nil then
+				local who = item.sessionId or "세션 없음"
+				lines = lines .. who .. " " .. tostring(item.text) .. "\n"
+				count = count + 1
+			end
+			index = index - 1
+		end
+		if lines == "" then
+			lines = "기록된 변경이 없습니다. 파일 목록과 테스트 결과는 만들지 않습니다."
+		end
+		local board = _EntityService:GetEntityByPath(self.NoticePath)
+		if board ~= nil and board.NoticeBoard ~= nil then
+			board.NoticeBoard:SetNotice(lines)
+		end
 	end
 
 	@ExecSpace("ServerOnly")
@@ -243,6 +304,13 @@ script VillageRelay extends Component
 		end
 		if npc.ChatBalloonComponent ~= nil and character.station == "user" then
 			npc.ChatBalloonComponent.Message = character.activity
+		end
+		if npc.OfficeStatus ~= nil then
+			if self.WorldToken == "" then
+				npc.OfficeStatus.StatusLine = "릴레이에 붙어 있지 않습니다. 진행 중으로 표시하지 않습니다."
+			else
+				npc.OfficeStatus.StatusLine = character.activity or ""
+			end
 		end
 	end
 
@@ -305,15 +373,16 @@ script VillageRelay extends Component
 		self:SendCommand(commandId, commandType, payload)
 	end
 
-	@ExecSpace("ServerOnly")
+	@ExecSpace("ClientOnly")
 	method void PushLibrary(string text)
+		-- UI entities exist on the client. postId 1154: do not look up /ui from the server.
 		local hall = _EntityService:GetEntityByPath(self.LibraryHallPath)
 		if hall ~= nil and hall.LibraryHall ~= nil then
 			hall.LibraryHall:ShowFromServer(text)
 		end
 	end
 
-	@ExecSpace("ServerOnly")
+	@ExecSpace("ClientOnly")
 	method void PushUi(string kind, string text)
 		local desk = _EntityService:GetEntityByPath(self.GoalDeskPath)
 		if desk == nil or desk.GoalDesk == nil then

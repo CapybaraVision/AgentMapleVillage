@@ -24,6 +24,9 @@ export const WORLD_COMMANDS = [
   'library.search',
   'library.read',
   'library.neighbors',
+  'library.browse',
+  'library.organize',
+  'library.retract',
 ] as const;
 export type WorldCommandType = (typeof WORLD_COMMANDS)[number];
 

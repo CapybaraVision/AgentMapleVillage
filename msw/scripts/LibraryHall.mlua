@@ -8,23 +8,114 @@
 @Component
 script LibraryHall extends Component
 	property string RelayPath = "/maps/AgentMapleVillage/VillageRelay"
-	property string SearchInputPath = "/ui/AgentMapleLibrary/SearchInput"
-	property string NodeInputPath = "/ui/AgentMapleLibrary/NodeInput"
-	property string TitleInputPath = "/ui/AgentMapleLibrary/TitleInput"
-	property string BodyInputPath = "/ui/AgentMapleLibrary/BodyInput"
-	property string SourceInputPath = "/ui/AgentMapleLibrary/SourceInput"
-	property string TaskInputPath = "/ui/AgentMapleLibrary/TaskInput"
-	property string FromInputPath = "/ui/AgentMapleLibrary/FromInput"
-	property string ToInputPath = "/ui/AgentMapleLibrary/ToInput"
-	property string EdgeInputPath = "/ui/AgentMapleLibrary/EdgeInput"
-	property string ResultTextPath = "/ui/AgentMapleLibrary/ResultText"
+	property string SearchInputPath = "/ui/AgentMapleLibrary/Board/SearchInput"
+	property string NodeInputPath = "/ui/AgentMapleLibrary/Board/NodeInput"
+	property string TitleInputPath = "/ui/AgentMapleLibrary/Board/TitleInput"
+	property string BodyInputPath = "/ui/AgentMapleLibrary/Board/BodyInput"
+	property string SourceInputPath = "/ui/AgentMapleLibrary/Board/SourceInput"
+	property string TaskInputPath = "/ui/AgentMapleLibrary/Board/TaskInput"
+	property string FromInputPath = "/ui/AgentMapleLibrary/Board/FromInput"
+	property string ToInputPath = "/ui/AgentMapleLibrary/Board/ToInput"
+	property string EdgeInputPath = "/ui/AgentMapleLibrary/Board/EdgeInput"
+	property string ResultTextPath = "/ui/AgentMapleLibrary/Board/ResultText"
 	property string BoardPath = "/ui/AgentMapleLibrary/Board"
 	property string OtherBoardPath = "/ui/AgentMapleDesk/Board"
+	property ButtonComponent OpenButton = "00000000-0000-4000-8000-000000000011"
+	property ButtonComponent SearchButton = "00000000-0000-4000-8000-000000000012"
+	property ButtonComponent ReadButton = "00000000-0000-4000-8000-000000000013"
+	property ButtonComponent NeighborButton = "00000000-0000-4000-8000-000000000014"
+	property ButtonComponent PublishSourceButton = "00000000-0000-4000-8000-000000000015"
+	property ButtonComponent PublishSummaryButton = "00000000-0000-4000-8000-000000000016"
+	property ButtonComponent LinkButton = "00000000-0000-4000-8000-000000000017"
+	property ButtonComponent ApproveButton = "00000000-0000-4000-8000-000000000018"
+	property any OpenHandler = nil
+	property any SearchHandler = nil
+	property any ReadHandler = nil
+	property any NeighborHandler = nil
+	property any PublishSourceHandler = nil
+	property any PublishSummaryHandler = nil
+	property any LinkHandler = nil
+	property any ApproveHandler = nil
 
 	@ExecSpace("ClientOnly")
 	method void OnBeginPlay()
 		self:SetEnabled(self.BoardPath, false)
-		self:WriteText(self.ResultTextPath, "도서관. kn_ 번호로 본문을 엽니다. 출처 기록과 세션 요약은 사실이 아닙니다.")
+		self:WriteText(self.ResultTextPath, "도서관. 세션 기록은 비공개 그래프에 남고, 출처 문장만 사실 후보가 아닙니다.")
+		self.OpenHandler = self:Listen(self.OpenButton, self.OnOpenClick)
+		self.SearchHandler = self:Listen(self.SearchButton, self.OnSearchClick)
+		self.ReadHandler = self:Listen(self.ReadButton, self.OnReadClick)
+		self.NeighborHandler = self:Listen(self.NeighborButton, self.OnNeighborClick)
+		self.PublishSourceHandler = self:Listen(self.PublishSourceButton, self.OnPublishSourceClick)
+		self.PublishSummaryHandler = self:Listen(self.PublishSummaryButton, self.OnPublishSummaryClick)
+		self.LinkHandler = self:Listen(self.LinkButton, self.OnLinkClick)
+		self.ApproveHandler = self:Listen(self.ApproveButton, self.OnApproveClick)
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnEndPlay()
+		self:Silence(self.OpenButton, self.OpenHandler)
+		self:Silence(self.SearchButton, self.SearchHandler)
+		self:Silence(self.ReadButton, self.ReadHandler)
+		self:Silence(self.NeighborButton, self.NeighborHandler)
+		self:Silence(self.PublishSourceButton, self.PublishSourceHandler)
+		self:Silence(self.PublishSummaryButton, self.PublishSummaryHandler)
+		self:Silence(self.LinkButton, self.LinkHandler)
+		self:Silence(self.ApproveButton, self.ApproveHandler)
+	end
+
+	@ExecSpace("ClientOnly")
+	method any Listen(ButtonComponent button, any handler)
+		if button == nil or button.Entity == nil then
+			return nil
+		end
+		return button.Entity:ConnectEvent(ButtonClickEvent, handler)
+	end
+
+	@ExecSpace("ClientOnly")
+	method void Silence(ButtonComponent button, any handler)
+		if button ~= nil and button.Entity ~= nil and handler ~= nil then
+			button.Entity:DisconnectEvent(ButtonClickEvent, handler)
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnOpenClick()
+		self:ToggleBoard()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnSearchClick()
+		self:OnSearch()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnReadClick()
+		self:OnRead()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnNeighborClick()
+		self:OnNeighbors()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnPublishSourceClick()
+		self:OnPublishSource()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnPublishSummaryClick()
+		self:OnPublishSummary()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnLinkClick()
+		self:OnLink()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnApproveClick()
+		self:OnApprove()
 	end
 
 	@ExecSpace("ClientOnly")
@@ -46,12 +137,6 @@ script LibraryHall extends Component
 		if entity ~= nil then
 			entity.Enable = enabled
 		end
-	end
-
-	@ExecSpace("ClientOnly")
-	@EventSender("Entity", "/ui/AgentMapleLibrary/OpenButton")
-	handler HandleOpenButton(ButtonClickEvent event)
-		self:ToggleBoard()
 	end
 
 	@ExecSpace("ClientOnly")
@@ -113,48 +198,6 @@ script LibraryHall extends Component
 		if relay ~= nil then
 			relay:SubmitLibraryApprove(self:ReadText(self.EdgeInputPath))
 		end
-	end
-
-	@ExecSpace("ClientOnly")
-	@EventSender("Entity", "/ui/AgentMapleLibrary/SearchButton")
-	handler HandleLibrarySearch(ButtonClickEvent event)
-		self:OnSearch()
-	end
-
-	@ExecSpace("ClientOnly")
-	@EventSender("Entity", "/ui/AgentMapleLibrary/ReadButton")
-	handler HandleLibraryRead(ButtonClickEvent event)
-		self:OnRead()
-	end
-
-	@ExecSpace("ClientOnly")
-	@EventSender("Entity", "/ui/AgentMapleLibrary/NeighborButton")
-	handler HandleLibraryNeighbors(ButtonClickEvent event)
-		self:OnNeighbors()
-	end
-
-	@ExecSpace("ClientOnly")
-	@EventSender("Entity", "/ui/AgentMapleLibrary/PublishSourceButton")
-	handler HandlePublishSource(ButtonClickEvent event)
-		self:OnPublishSource()
-	end
-
-	@ExecSpace("ClientOnly")
-	@EventSender("Entity", "/ui/AgentMapleLibrary/PublishSummaryButton")
-	handler HandlePublishSummary(ButtonClickEvent event)
-		self:OnPublishSummary()
-	end
-
-	@ExecSpace("ClientOnly")
-	@EventSender("Entity", "/ui/AgentMapleLibrary/LinkButton")
-	handler HandleLibraryLink(ButtonClickEvent event)
-		self:OnLink()
-	end
-
-	@ExecSpace("ClientOnly")
-	@EventSender("Entity", "/ui/AgentMapleLibrary/ApproveButton")
-	handler HandleLibraryApprove(ButtonClickEvent event)
-		self:OnApprove()
 	end
 
 	@ExecSpace("ClientOnly")

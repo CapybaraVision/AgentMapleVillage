@@ -19,7 +19,7 @@ import {
 import { fingerprint } from './json.js';
 import { readJson, writeJsonAtomic } from './persist.js';
 import type { SessionDriver, TurnResult } from './claude-driver.js';
-import { emptyLibrary, Library, LibraryError, type KnowledgeEdge, type KnowledgeNode, type LibraryPanel, type LibraryState } from './library.js';
+import { emptyLibrary, Library, LibraryError, migrateLibrary, type KnowledgeEdge, type KnowledgeNode, type LibraryPanel, type LibraryState } from './library.js';
 
 export interface Clock {
   now(): number;
@@ -218,7 +218,7 @@ export class Office {
     if (saved.version !== 1) throw new OfficeError('bad_request', 'unsupported office state version');
     const loose = saved as OfficeState & { library?: LibraryState; villageId?: string };
     if (!loose.villageId) loose.villageId = '';
-    if (!loose.library) loose.library = emptyLibrary(loose.villageId);
+    loose.library = migrateLibrary(loose.library, loose.villageId);
     loose.backend = opts.backend.id;
     return new Office(loose, opts.backend, clock, opts.file);
   }
@@ -274,6 +274,13 @@ export class Office {
     throw new OfficeError('denied', `command type ${type} is not handled locally`);
   }
 
+  private rememberWork(sessionId: string, taskId: string, title: string, outcome: string, now: number): DomainEvent[] {
+    if (!this.state.villageId) return [];
+    const kept = this.library().retainSession({ sessionId, taskId, title, outcome, shelf: 'work' });
+    if (!kept.node || kept.reason === 'duplicate' || kept.reason === 'tombstone') return [];
+    return [this.libraryNodeEvent(kept.node, now), ...kept.edges.map((edge) => this.libraryEdgeEvent(edge, now))];
+  }
+
   private library(): Library {
     return new Library(this.state.library, this.clock, {
       villageId: () => this.state.villageId,
@@ -300,6 +307,7 @@ export class Office {
           ...(typeof payload.sessionId === 'string' ? { sessionId: payload.sessionId } : {}),
           ...(typeof payload.taskId === 'string' ? { taskId: payload.taskId } : {}),
           ...(typeof payload.sourceLabel === 'string' ? { sourceLabel: payload.sourceLabel } : {}),
+          ...(typeof payload.shelf === 'string' ? { shelf: payload.shelf as 'project' | 'concept' | 'work' | 'source' } : {}),
           ...(typeof payload.locator === 'string' ? { locator: payload.locator } : {}),
           ...(typeof payload.groundedNodeId === 'string' ? { groundedNodeId: payload.groundedNodeId } : {}),
           ...(typeof payload.villageId === 'string' ? { villageId: payload.villageId } : {}),
@@ -350,7 +358,25 @@ export class Office {
           events: [this.libraryEdgeEvent(approved.edge, now)],
         };
       }
-      if (type === 'library.search' || type === 'library.read' || type === 'library.neighbors') {
+      if (type === 'library.retract') {
+        const node = this.library().retract({
+          explicit: payload.explicit === true,
+          nodeId: stringField(payload, 'nodeId'),
+          ...(typeof payload.villageId === 'string' ? { villageId: payload.villageId } : {}),
+        });
+        return { result: { nodeId: node.id, retracted: true, assertsFact: false }, events: [] };
+      }
+      if (type === 'library.organize') {
+        const before = this.library().nodeRevision(stringField(payload, 'nodeId'));
+        const node = this.library().organize({
+          explicit: payload.explicit === true,
+          nodeId: stringField(payload, 'nodeId'),
+          shelf: stringField(payload, 'shelf'),
+          ...(typeof payload.villageId === 'string' ? { villageId: payload.villageId } : {}),
+        });
+        return { result: { nodeId: node.id, revision: node.revision, revisionUnchanged: node.revision === before, assertsFact: false }, events: [this.libraryNodeEvent(node, now)] };
+      }
+      if (type === 'library.search' || type === 'library.read' || type === 'library.neighbors' || type === 'library.browse') {
         const panel = this.libraryPanel(type, payload);
         return { result: { mode: panel.mode, count: panel.cards.length, executable: false }, events: [this.libraryPanelEvent(panel, now)] };
       }
@@ -368,12 +394,21 @@ export class Office {
         query: stringField(payload, 'query'),
         ...(typeof payload.limit === 'number' ? { limit: payload.limit } : {}),
         ...(typeof payload.kind === 'string' ? { kind: payload.kind } : {}),
+        ...(typeof payload.shelf === 'string' ? { shelf: payload.shelf } : {}),
         ...(typeof payload.taskId === 'string' ? { taskId: payload.taskId } : {}),
         ...(typeof payload.sessionId === 'string' ? { sessionId: payload.sessionId } : {}),
         ...(villageId ? { villageId } : {}),
       });
     }
     if (type === 'library.read') return this.library().read({ nodeId: stringField(payload, 'nodeId'), ...(villageId ? { villageId } : {}) }).panel;
+    if (type === 'library.browse') {
+      return this.library().browse({
+        ...(typeof payload.query === 'string' ? { query: payload.query } : {}),
+        ...(typeof payload.shelf === 'string' ? { shelf: payload.shelf } : {}),
+        ...(typeof payload.kind === 'string' ? { kind: payload.kind } : {}),
+        ...(villageId ? { villageId } : {}),
+      });
+    }
     return this.library().neighbors({
       nodeId: stringField(payload, 'nodeId'),
       ...(typeof payload.depth === 'number' ? { depth: payload.depth } : {}),
@@ -577,8 +612,9 @@ export class Office {
         this.taskEvent(task, now),
         this.goalEvent(goal, now),
         this.characterEvent(worker, now),
-        this.feed(now, 'error', continued.summary, worker.sessionId),
+        this.feed(now, 'error', '작업이 거절되어 멈췄습니다.', worker.sessionId),
         this.statusEvent(now),
+        ...this.rememberWork(worker.sessionId, task.id, goal.text, '거절', now),
       );
       return { result: { decisionId, goalId: goal.id, status: goal.status, denied: true }, events };
     }
@@ -606,6 +642,7 @@ export class Office {
       ...(lead ? [this.characterEvent(lead, now)] : []),
       this.feed(now, 'goal', '목표가 끝났습니다.', worker.sessionId),
       this.statusEvent(now),
+      ...this.rememberWork(worker.sessionId, task.id, goal.text, `완료. 선택 ${decision.answer?.option ?? '없음'}`, now),
     );
     return { result: { decisionId, goalId: goal.id, taskId: task.id, status: 'done' }, events };
   }
@@ -686,6 +723,7 @@ export class Office {
         assertion: node.assertion,
         assertsFact: false,
         revision: node.revision,
+        ...(node.shelf ? { shelf: node.shelf } : {}),
         ...(node.taskId ? { taskId: node.taskId } : {}),
         ...(node.sessionId ? { sessionId: node.sessionId } : {}),
         ...(node.sourceLabel ? { sourceLabel: node.sourceLabel } : {}),

@@ -42,7 +42,7 @@ const STATE_LABELS: Record<string, string> = {
   error: '오류',
 };
 
-const READ_ACTIONS = ['library.search', 'library.read', 'library.neighbors'] as const;
+const READ_ACTIONS = ['library.search', 'library.read', 'library.neighbors', 'library.browse'] as const;
 
 export function presentCharacter(input: {
   character: PresentCharacter;

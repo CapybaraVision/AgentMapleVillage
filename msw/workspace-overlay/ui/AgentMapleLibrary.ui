@@ -1,7 +1,7 @@
 {
   "Id": "",
   "GameId": "",
-  "EntryKey": "ui://be7e7c56-fff2-4992-b3b5-b9e052f42052",
+  "EntryKey": "ui://17ecf54d-adc9-4a2e-8304-cd4bd2503ed9",
   "ContentType": "x-mod/ui",
   "Content": "",
   "Usage": 0,
@@ -14,7 +14,7 @@
     "Use": "Binary",
     "Entities": [
       {
-        "id": "be7e7c56-fff2-4992-b3b5-b9e052f42052",
+        "id": "17ecf54d-adc9-4a2e-8304-cd4bd2503ed9",
         "path": "/ui/AgentMapleLibrary",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.UIGroupComponent,MOD.Core.CanvasGroupComponent",
         "jsonString": {
@@ -113,7 +113,7 @@
         }
       },
       {
-        "id": "b50bed46-6eef-4a3c-bd51-68b548cee026",
+        "id": "724bf5a8-3bde-49de-be47-2ad5a8ceb2f3",
         "path": "/ui/AgentMapleLibrary/OpenButton",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.ButtonComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.UITouchReceiveComponent",
         "jsonString": {
@@ -356,7 +356,7 @@
         }
       },
       {
-        "id": "650b43ee-a047-4762-8238-19f8d0fc011b",
+        "id": "7cd6b77b-6793-4ba5-9bc0-78274f5631b5",
         "path": "/ui/AgentMapleLibrary/Board",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent",
         "jsonString": {
@@ -501,7 +501,7 @@
         }
       },
       {
-        "id": "b4b8f632-0f30-4385-ad25-7be65a26a666",
+        "id": "f03ab64a-f6ce-467c-a21d-cfe3f059f296",
         "path": "/ui/AgentMapleLibrary/Board/Title",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent",
         "jsonString": {
@@ -690,7 +690,7 @@
         }
       },
       {
-        "id": "be5d6b5d-425a-45d8-a43f-9c52bf82a454",
+        "id": "ca9c7f28-61f2-445c-8f90-65a99fd4709c",
         "path": "/ui/AgentMapleLibrary/Board/ResultText",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent",
         "jsonString": {
@@ -879,7 +879,7 @@
         }
       },
       {
-        "id": "e80adbb9-73b3-4bf2-97b6-18ffec076867",
+        "id": "84fb6a86-0219-439d-a390-5bd1e4c9694b",
         "path": "/ui/AgentMapleLibrary/Board/SearchInput",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.TextGUIRendererInputComponent",
         "jsonString": {
@@ -1090,7 +1090,7 @@
         }
       },
       {
-        "id": "84e2cbef-a65c-431c-94b3-080dc0667b05",
+        "id": "aa20f789-5a06-41b7-b659-84d94cd6c734",
         "path": "/ui/AgentMapleLibrary/Board/SearchButton",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.ButtonComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.UITouchReceiveComponent",
         "jsonString": {
@@ -1333,7 +1333,7 @@
         }
       },
       {
-        "id": "3eb8cf47-c653-4d88-a4a7-ee0340b9e602",
+        "id": "98f56126-3cb9-42f4-892b-2b141125081a",
         "path": "/ui/AgentMapleLibrary/Board/NodeInput",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.TextGUIRendererInputComponent",
         "jsonString": {
@@ -1544,7 +1544,7 @@
         }
       },
       {
-        "id": "ef7b7af0-c931-45e7-8a68-e724f495ad26",
+        "id": "b0f9e008-94c7-4b94-a279-2efbee4e8645",
         "path": "/ui/AgentMapleLibrary/Board/ReadButton",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.ButtonComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.UITouchReceiveComponent",
         "jsonString": {
@@ -1787,7 +1787,7 @@
         }
       },
       {
-        "id": "583674b4-c658-4da2-99c8-0192125fb414",
+        "id": "d389bc3a-1341-43b0-893d-2a0101945a23",
         "path": "/ui/AgentMapleLibrary/Board/NeighborButton",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.ButtonComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.UITouchReceiveComponent",
         "jsonString": {
@@ -2030,7 +2030,7 @@
         }
       },
       {
-        "id": "dc3d2296-5eae-4dea-989c-cee12290a341",
+        "id": "5bd7a501-52b6-4683-850c-a5c815ec338b",
         "path": "/ui/AgentMapleLibrary/Board/TitleInput",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.TextGUIRendererInputComponent",
         "jsonString": {
@@ -2241,7 +2241,7 @@
         }
       },
       {
-        "id": "e01b8398-7c0c-460e-b290-397e1ecb62d9",
+        "id": "556d2eae-2c48-4ee8-a376-d1c2bf61ca1f",
         "path": "/ui/AgentMapleLibrary/Board/BodyInput",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.TextGUIRendererInputComponent",
         "jsonString": {
@@ -2452,7 +2452,7 @@
         }
       },
       {
-        "id": "28bf5af0-0362-4d36-9416-08bc088e909d",
+        "id": "d976290e-b819-4013-a143-a089c828e42d",
         "path": "/ui/AgentMapleLibrary/Board/SourceInput",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.TextGUIRendererInputComponent",
         "jsonString": {
@@ -2663,7 +2663,7 @@
         }
       },
       {
-        "id": "43641824-fd00-4b2a-beab-8780b24f8d27",
+        "id": "cd6cc8c2-fa04-4b77-acfa-24f3e33ab7fe",
         "path": "/ui/AgentMapleLibrary/Board/TaskInput",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.TextGUIRendererInputComponent",
         "jsonString": {
@@ -2874,7 +2874,7 @@
         }
       },
       {
-        "id": "44f49c47-cc3d-4a74-b330-e06438ace70d",
+        "id": "1d0200a9-d9b1-41d7-98d7-171fe738c395",
         "path": "/ui/AgentMapleLibrary/Board/PublishSourceButton",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.ButtonComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.UITouchReceiveComponent",
         "jsonString": {
@@ -3117,7 +3117,7 @@
         }
       },
       {
-        "id": "71ac70f1-27c1-411a-80a9-97f01288b027",
+        "id": "0a7f00bd-287f-4e8e-8298-caed0abfdef4",
         "path": "/ui/AgentMapleLibrary/Board/PublishSummaryButton",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.ButtonComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.UITouchReceiveComponent",
         "jsonString": {
@@ -3360,7 +3360,7 @@
         }
       },
       {
-        "id": "5f95d4d2-192c-4987-a11f-880337ed2b62",
+        "id": "18ba978d-298d-44da-b161-6e8787eef066",
         "path": "/ui/AgentMapleLibrary/Board/FromInput",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.TextGUIRendererInputComponent",
         "jsonString": {
@@ -3571,7 +3571,7 @@
         }
       },
       {
-        "id": "b58693a0-4692-4c73-851c-ad01bd6ef68d",
+        "id": "3c372eb7-331c-4e0b-ac88-de48d4edd0a1",
         "path": "/ui/AgentMapleLibrary/Board/ToInput",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.TextGUIRendererInputComponent",
         "jsonString": {
@@ -3782,7 +3782,7 @@
         }
       },
       {
-        "id": "b375272c-fac7-4b89-8bc9-81cf9af6b708",
+        "id": "000f45cd-4729-4b61-853e-2f44bb8d0d8f",
         "path": "/ui/AgentMapleLibrary/Board/LinkButton",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.ButtonComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.UITouchReceiveComponent",
         "jsonString": {
@@ -4025,7 +4025,7 @@
         }
       },
       {
-        "id": "6d13bbf1-891c-4cad-8ceb-793cd5727d83",
+        "id": "35acc609-c6a1-4c40-b528-1a59d04faabf",
         "path": "/ui/AgentMapleLibrary/Board/EdgeInput",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.TextGUIRendererInputComponent",
         "jsonString": {
@@ -4236,7 +4236,7 @@
         }
       },
       {
-        "id": "e9742c13-327a-4122-8dc5-7d0cd408adea",
+        "id": "f149b550-ec82-4d7f-9605-fdefaaf199e2",
         "path": "/ui/AgentMapleLibrary/Board/ApproveButton",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.ButtonComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.UITouchReceiveComponent",
         "jsonString": {
@@ -4479,7 +4479,7 @@
         }
       },
       {
-        "id": "00e322e0-f4b4-4b5b-b53d-93c3c4537522",
+        "id": "036fbdbe-506d-4ae0-aeb0-0545b2a087a0",
         "path": "/ui/AgentMapleLibrary/LibraryHall",
         "componentNames": "MOD.Core.UITransformComponent,script.LibraryHall",
         "jsonString": {

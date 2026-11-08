@@ -282,7 +282,8 @@ describe('official builder overlay', () => {
       expect(ui.ContentProto?.Entities?.some((entity) => entity.path === `/ui/${name}`)).toBe(true);
     }
     const script = fs.readFileSync(path.join(overlay, 'RootDesk/MyDesk/AgentMapleVillage/GoalDesk.mlua'), 'utf8');
-    expect(script).toContain('/ui/AgentMapleDesk/GoalButton');
+    expect(script).toContain('/ui/AgentMapleDesk/Board/GoalInput');
+    expect(script).toContain('ConnectEvent(ButtonClickEvent');
     expect(fs.readdirSync(overlay, { recursive: true }).some((name) => String(name).endsWith('.codeblock'))).toBe(false);
   });
 
@@ -326,6 +327,17 @@ describe('official builder overlay', () => {
     const desk = fs.readFileSync(path.join(overlay, 'ui/AgentMapleDesk.ui'), 'utf8');
     expect(desk).toContain('공개 릴레이가 없습니다.');
     expect(desk).not.toContain('마을 연결 전');
+  });
+
+  it('binds each command button UUID into the script instead of a path EventSender', () => {
+    const ui = readJson('ui/AgentMapleDesk.ui') as { ContentProto?: { Entities?: Array<{ id?: string; path?: string }> } };
+    const open = ui.ContentProto?.Entities?.find((entity) => entity.path === '/ui/AgentMapleDesk/OpenButton');
+    const script = fs.readFileSync(path.join(overlay, 'RootDesk/MyDesk/AgentMapleVillage/GoalDesk.mlua'), 'utf8');
+    expect(open?.id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(script).toContain(`property ButtonComponent OpenButton = "${open?.id}"`);
+    expect(script).toContain('ConnectEvent(ButtonClickEvent');
+    expect(script).not.toContain('@EventSender("Entity"');
+    expect(script).not.toContain('00000000-0000-4000-8000-000000000001');
   });
 
   it('keeps every resource id inside the official skill provenance list', () => {

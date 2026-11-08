@@ -1,0 +1,39 @@
+--[[
+  Shows sanitized office feed lines. It does not invent file diffs or review results.
+]]
+
+@Component
+script NoticeBoard extends Component
+	property string NoticeText = "기록된 변경이 없습니다. 파일 목록과 테스트 결과는 만들지 않습니다."
+	property any TouchHandler = nil
+
+	@ExecSpace("ClientOnly")
+	method void OnBeginPlay()
+		self:Paint()
+	end
+
+	@ExecSpace("ClientOnly")
+	@EventSender("Self")
+	handler HandleTouchEvent(TouchEvent event)
+		self:OnTouch()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnTouch()
+		if self.Entity.ChatBalloonComponent ~= nil then
+			self.Entity.ChatBalloonComponent.Message = self.NoticeText
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SetNotice(string text)
+		self.NoticeText = text
+		self:Paint()
+	end
+
+	method void Paint()
+		if self.Entity ~= nil and self.Entity.NameTagComponent ~= nil then
+			self.Entity.NameTagComponent.Name = "게시판"
+		end
+	end
+end

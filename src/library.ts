@@ -3,6 +3,9 @@
  * A source node quotes a labeled source. A summary node is an agent or user summary.
  * Neither asserts a fact. Related edges start as proposals until the user approves the link.
  * Approval keeps the link; it does not turn the text into a fact.
+ * A finished session writes one short work record into this private village store.
+ * That record is still a summary. Explicit publish is still required for a sourced statement.
+ * Retracting a record leaves a tombstone so the same session result is not written again.
  * This module does not read the filesystem, chat logs, or the synthetic example file.
  */
 
@@ -22,10 +25,27 @@ export const TITLE_LIMIT = 80;
 export const BODY_LIMIT = 2_000;
 
 export type KnowledgeKind = 'source' | 'summary';
+export type Shelf = 'project' | 'concept' | 'work' | 'source';
 export type Assertion = 'citation' | 'summary';
 export type EdgeKind = 'grounded_in' | 'related';
 export type EdgeStatus = 'proposed' | 'approved';
 export type AuthorRole = 'user' | 'session';
+
+export const SHELVES: readonly Shelf[] = ['project', 'concept', 'work', 'source'];
+export const GRAPH_SLOT_LIMIT = 6;
+/** Adjacent cells of a 3×2 grid. The UI has no line component, so only these pairs get a bar. */
+export const GRAPH_ORTHOGONAL: readonly (readonly [number, number])[] = [
+  [0, 1],
+  [1, 2],
+  [3, 4],
+  [4, 5],
+  [0, 3],
+  [1, 4],
+  [2, 5],
+];
+export const GRAPH_NOTE = '공식 UI에는 선 그래프가 없습니다. 지식은 여섯 칸에 놓고, 맞닿은 칸만 막대로 잇습니다. 떨어진 연결은 목록에 남습니다.';
+export const EMPTY_LIBRARY = '아직 기록이 없습니다. 세션 작업은 비공개 그래프에 남고, 출처 문장은 명시적으로 올릴 때만 생깁니다.';
+export const SESSION_NODE_LIMIT = 12;
 
 export interface Revision {
   revision: number;
@@ -49,6 +69,7 @@ export interface KnowledgeNode {
   sessionId?: string;
   authorRole: AuthorRole;
   authorId: string;
+  shelf?: Shelf;
   revision: number;
   revisions: Revision[];
   redacted: boolean;
@@ -72,10 +93,18 @@ export interface KnowledgeEdge {
   approvedAt?: number;
 }
 
+export interface Tombstone {
+  contentHash: string;
+  nodeId: string;
+  villageId: string;
+  retiredAt: number;
+}
+
 export interface LibraryState {
   villageId: string;
   nodes: KnowledgeNode[];
   edges: KnowledgeEdge[];
+  tombstones: Tombstone[];
   counters: { node: number; edge: number };
 }
 
@@ -87,12 +116,16 @@ export interface LibraryCard {
   snippet: string;
   assertion: Assertion;
   assertsFact: false;
+  revision: number;
+  shelf?: Shelf;
+  shelfLabel?: string;
+  sourceLabel?: string;
   taskId?: string;
   sessionId?: string;
 }
 
 export interface LibraryPanel {
-  mode: 'search' | 'read' | 'neighbors';
+  mode: 'search' | 'read' | 'neighbors' | 'browse';
   notice: string;
   text: string;
   query?: string;
@@ -107,6 +140,27 @@ export interface LibraryPanel {
     assertsFact: false;
   }>;
   executable: false;
+  graph: GraphView;
+}
+
+export interface GraphSlot {
+  slot: number;
+  id: string;
+  label: string;
+}
+
+export interface GraphLink {
+  fromSlot: number;
+  toSlot: number;
+  id: string;
+  status: EdgeStatus;
+}
+
+export interface GraphView {
+  limit: typeof GRAPH_SLOT_LIMIT;
+  slots: GraphSlot[];
+  links: GraphLink[];
+  note: string;
 }
 
 export interface ReferenceBlock {
@@ -116,11 +170,26 @@ export interface ReferenceBlock {
 }
 
 export function emptyLibrary(villageId: string): LibraryState {
-  return { villageId, nodes: [], edges: [], counters: { node: 0, edge: 0 } };
+  return { villageId, nodes: [], edges: [], tombstones: [], counters: { node: 0, edge: 0 } };
 }
 
 export function kindLabel(kind: KnowledgeKind): string {
   return kind === 'source' ? '출처 기록' : '세션 요약';
+}
+
+export function shelfLabel(shelf: Shelf): string {
+  if (shelf === 'project') return '프로젝트';
+  if (shelf === 'concept') return '개념';
+  if (shelf === 'work') return '작업 기록';
+  return '출처';
+}
+
+export function isShelf(value: string): value is Shelf {
+  return (SHELVES as readonly string[]).includes(value);
+}
+
+export function organizeLabel(node: { kind: KnowledgeKind; shelf?: Shelf }): string {
+  return node.shelf ? `${shelfLabel(node.shelf)} · ${kindLabel(node.kind)}` : kindLabel(node.kind);
 }
 
 export function statusLabel(status: EdgeStatus): string {
@@ -172,6 +241,9 @@ export function toCard(node: KnowledgeNode): LibraryCard {
     snippet: snippet(node.body),
     assertion: node.assertion,
     assertsFact: false,
+    revision: node.revision,
+    ...(node.shelf ? { shelf: node.shelf, shelfLabel: shelfLabel(node.shelf) } : {}),
+    ...(node.sourceLabel ? { sourceLabel: node.sourceLabel } : {}),
     ...(node.taskId ? { taskId: node.taskId } : {}),
     ...(node.sessionId ? { sessionId: node.sessionId } : {}),
   };
@@ -205,8 +277,65 @@ export function formatPanel(panel: Omit<LibraryPanel, 'text' | 'executable' | 'n
       lines.push(`- ${edge.fromId} —${edge.statusLabel}/${kindText}→ ${edge.toId}`);
     }
   }
-  if (!panel.cards.length) lines.push('해당하는 지식이 없습니다.');
+  if (!panel.cards.length) lines.push(panel.mode === 'browse' ? EMPTY_LIBRARY : '해당하는 지식이 없습니다.');
+  if (panel.graph) {
+    lines.push(panel.graph.note);
+    for (const slot of panel.graph.slots) lines.push(`#slot ${slot.slot} ${slot.id} ${oneLine(slot.label)}`);
+    for (const link of panel.graph.links) lines.push(`#link ${link.fromSlot} ${link.toSlot} ${link.status} ${link.id}`);
+  }
   return lines.join('\n');
+}
+
+function oneLine(value: string): string {
+  return value.replace(/[\r\n#]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+export function layoutGraph(
+  nodes: Array<{ id: string; label: string }>,
+  edges: Array<{ id: string; fromId: string; toId: string; status: EdgeStatus }>,
+): GraphView {
+  const sorted = [...nodes].sort((a, b) => idNumber(a.id) - idNumber(b.id) || a.id.localeCompare(b.id)).slice(0, GRAPH_SLOT_LIMIT);
+  const slots = sorted.map((node, slot) => ({ slot, id: node.id, label: node.label }));
+  const slotOf = new Map(slots.map((slot) => [slot.id, slot.slot]));
+  const ortho = new Set(GRAPH_ORTHOGONAL.map(([left, right]) => `${left}:${right}`));
+  const links: GraphLink[] = [];
+  for (const edge of edges) {
+    const from = slotOf.get(edge.fromId);
+    const to = slotOf.get(edge.toId);
+    if (from === undefined || to === undefined || from === to) continue;
+    const low = Math.min(from, to);
+    const high = Math.max(from, to);
+    if (!ortho.has(`${low}:${high}`)) continue;
+    links.push({ fromSlot: low, toSlot: high, id: edge.id, status: edge.status });
+  }
+  links.sort((a, b) => a.fromSlot - b.fromSlot || a.toSlot - b.toSlot || a.id.localeCompare(b.id));
+  return { limit: GRAPH_SLOT_LIMIT, slots, links, note: GRAPH_NOTE };
+}
+
+export function migrateLibrary(input: Partial<LibraryState> | undefined, villageId: string): LibraryState {
+  if (!input || !Array.isArray(input.nodes) || !Array.isArray(input.edges)) return emptyLibrary(villageId);
+  const nodes = input.nodes.filter((node): node is KnowledgeNode => Boolean(node) && typeof node.id === 'string');
+  const edges = input.edges.filter((edge): edge is KnowledgeEdge => Boolean(edge) && typeof edge.id === 'string');
+  const tombstones = Array.isArray(input.tombstones)
+    ? input.tombstones.filter((item): item is Tombstone => Boolean(item) && typeof item.contentHash === 'string' && typeof item.nodeId === 'string')
+    : [];
+  const nodeCounter = nodes.reduce((max, node) => Math.max(max, idNumber(node.id)), 0);
+  const edgeCounter = edges.reduce((max, edge) => Math.max(max, idNumber(edge.id)), 0);
+  return {
+    villageId: typeof input.villageId === 'string' ? input.villageId : villageId,
+    nodes,
+    edges,
+    tombstones,
+    counters: {
+      node: Math.max(input.counters?.node ?? 0, nodeCounter),
+      edge: Math.max(input.counters?.edge ?? 0, edgeCounter),
+    },
+  };
+}
+
+function idNumber(id: string): number {
+  const match = /^(?:kn|ke)_([1-9][0-9]{0,8})$/.exec(id);
+  return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
 }
 
 export interface LibraryAccess {
@@ -234,6 +363,7 @@ export interface PublishInput {
   sessionId?: string;
   taskId?: string;
   sourceLabel?: string;
+  shelf?: Shelf;
   locator?: string;
   groundedNodeId?: string;
   villageId?: string;
@@ -268,6 +398,7 @@ export class Library {
     if (input.explicit !== true) throw new LibraryError('denied', '도서관에 올리는 것은 명시적 요청만 받습니다.');
     const villageId = this.requireVillage(input.villageId);
     if (input.kind !== 'source' && input.kind !== 'summary') throw new LibraryError('bad_request', '종류는 출처 기록 또는 세션 요약만 됩니다.');
+    if (input.shelf !== undefined && !isShelf(input.shelf)) throw new LibraryError('bad_request', '분류는 프로젝트, 개념, 작업 기록, 출처만 됩니다.');
     const title = cleanText(input.title, TITLE_LIMIT, '제목');
     const bodyResult = redactSecrets(cleanText(input.body, BODY_LIMIT, '본문'));
     const author = this.author(input.authorRole, input.authorId, input.sessionId);
@@ -314,6 +445,7 @@ export class Library {
       title,
       body: bodyResult.text,
       ...(sourceLabel ? { sourceLabel } : {}),
+      ...(input.shelf ? { shelf: input.shelf } : {}),
       ...(input.taskId ? { taskId: input.taskId } : {}),
       ...(input.sessionId ? { sessionId: input.sessionId } : {}),
       authorRole: author.role,
@@ -407,12 +539,120 @@ export class Library {
     return { edge, alreadyApproved: false };
   }
 
-  search(input: { query: string; limit?: number; villageId?: string; kind?: string; taskId?: string; sessionId?: string }): LibraryPanel {
+  nodeRevision(nodeId: string): number {
+    return this.node(nodeId).revision;
+  }
+
+  retainSession(input: { sessionId: string; taskId?: string; title: string; outcome: string; shelf?: Shelf; villageId?: string }): { node: KnowledgeNode | null; edges: KnowledgeEdge[]; reason: 'created' | 'duplicate' | 'tombstone' | 'limit' | 'empty' } {
+    const villageId = this.requireVillage(input.villageId);
+    if (!this.access.hasSession(input.sessionId)) throw new LibraryError('not_found', '이 마을에 없는 세션입니다.');
+    const title = redactSecrets(cleanText(input.title, TITLE_LIMIT, '제목')).text;
+    const outcome = redactSecrets(cleanText(input.outcome, 160, '결과')).text;
+    if (looksLikeLocalPath(title) || looksLikeLocalPath(outcome)) return { node: null, edges: [], reason: 'empty' };
+    const body = `세션이 만든 작업 기록입니다. 출처가 확인된 문장이 아니고 사실로 단정하지 않습니다.\n상태: ${outcome}`;
+    const contentHash = fingerprint({
+      villageId,
+      kind: 'summary',
+      title: normalize(title),
+      body: normalize(body),
+      sessionId: input.sessionId,
+    });
+    if (this.data.tombstones.some((item) => item.villageId === villageId && item.contentHash === contentHash)) {
+      return { node: null, edges: [], reason: 'tombstone' };
+    }
+    const existing = this.data.nodes.find((item) => item.villageId === villageId && item.contentHash === contentHash);
+    if (existing) return { node: existing, edges: [], reason: 'duplicate' };
+    const owned = this.data.nodes.filter((item) => item.villageId === villageId && item.sessionId === input.sessionId).length;
+    if (owned >= SESSION_NODE_LIMIT) return { node: null, edges: [], reason: 'limit' };
+    const now = this.clock.now();
+    const id = `kn_${++this.data.counters.node}`;
+    const node: KnowledgeNode = {
+      id,
+      villageId,
+      kind: 'summary',
+      assertion: 'summary',
+      assertsFact: false,
+      title,
+      body,
+      shelf: input.shelf ?? 'work',
+      ...(input.taskId ? { taskId: input.taskId } : {}),
+      sessionId: input.sessionId,
+      authorRole: 'session',
+      authorId: input.sessionId,
+      revision: 1,
+      revisions: [{ revision: 1, title, body, authorRole: 'session', authorId: input.sessionId, ts: now }],
+      redacted: body.includes('[가림]') || title.includes('[가림]'),
+      contentHash,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.data.nodes.push(node);
+    const prior = [...this.data.nodes]
+      .reverse()
+      .find((item) => item.id !== node.id && item.villageId === villageId && item.kind === 'summary' && (item.sessionId === input.sessionId || (input.taskId !== undefined && item.taskId === input.taskId)));
+    const edges: KnowledgeEdge[] = [];
+    if (prior) {
+      edges.push(this.addEdge({
+        fromId: node.id,
+        toId: prior.id,
+        kind: 'related',
+        status: 'proposed',
+        authorRole: 'session',
+        authorId: input.sessionId,
+        note: '세션이 제안한 연결. 승인도 사실도 아닙니다.',
+      }));
+    }
+    return { node, edges, reason: 'created' };
+  }
+
+  retract(input: { explicit: boolean; nodeId: string; villageId?: string }): KnowledgeNode {
+    if (input.explicit !== true) throw new LibraryError('denied', '지우는 것은 명시적 요청만 받습니다.');
+    const villageId = this.requireVillage(input.villageId);
+    const node = this.node(input.nodeId);
+    this.data.nodes = this.data.nodes.filter((item) => item.id !== node.id);
+    this.data.edges = this.data.edges.filter((edge) => edge.fromId !== node.id && edge.toId !== node.id);
+    this.data.tombstones.push({ contentHash: node.contentHash, nodeId: node.id, villageId, retiredAt: this.clock.now() });
+    return node;
+  }
+
+  organize(input: { explicit: boolean; nodeId: string; shelf: string; villageId?: string }): KnowledgeNode {
+    if (input.explicit !== true) throw new LibraryError('denied', '분류를 바꾸는 것은 명시적 요청만 받습니다.');
+    this.requireVillage(input.villageId);
+    if (!isShelf(input.shelf)) throw new LibraryError('bad_request', '분류는 프로젝트, 개념, 작업 기록, 출처만 됩니다.');
+    const node = this.node(input.nodeId);
+    if (node.shelf !== input.shelf) {
+      node.shelf = input.shelf;
+      node.updatedAt = this.clock.now();
+    }
+    return node;
+  }
+
+  browse(input: { query?: string; shelf?: string; kind?: string; villageId?: string }): LibraryPanel {
+    const villageId = this.requireVillage(input.villageId);
+    if (input.shelf !== undefined && input.shelf !== '' && !isShelf(input.shelf)) throw new LibraryError('bad_request', '분류는 프로젝트, 개념, 작업 기록, 출처만 됩니다.');
+    if (input.kind && input.kind !== 'source' && input.kind !== 'summary') throw new LibraryError('bad_request', '검색 종류는 출처 기록 또는 세션 요약만 됩니다.');
+    const query = redactSecrets(input.query ?? '').text.trim();
+    if (query.length > 120) throw new LibraryError('bad_request', '검색어는 120자까지입니다.');
+    const parts = query.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 8);
+    const ranked = this.data.nodes
+      .filter((node) => node.villageId === villageId)
+      .filter((node) => !input.shelf || node.shelf === input.shelf)
+      .filter((node) => !input.kind || node.kind === input.kind)
+      .filter((node) => !query || scoreNode(node, parts, query.toLowerCase()) > 0)
+      .sort((a, b) => idNumber(a.id) - idNumber(b.id));
+    const cards = ranked.slice(0, SEARCH_LIMIT).map((node) => toCard(node));
+    const ids = new Set(cards.map((card) => card.id));
+    const edges = this.data.edges.filter((edge) => edge.villageId === villageId && ids.has(edge.fromId) && ids.has(edge.toId)).map(edgeView);
+    return this.panel('browse', cards, edges, query || undefined);
+  }
+
+  search(input: { query: string; limit?: number; villageId?: string; kind?: string; shelf?: string; taskId?: string; sessionId?: string }): LibraryPanel {
     const villageId = this.requireVillage(input.villageId);
     const redacted = redactSecrets(input.query ?? '');
     const query = redacted.text.trim();
     if (!query || query.length > 120) throw new LibraryError('bad_request', '검색어는 1자에서 120자입니다.');
     if (input.kind && input.kind !== 'source' && input.kind !== 'summary') throw new LibraryError('bad_request', '검색 종류는 출처 기록 또는 세션 요약만 됩니다.');
+    if (input.shelf !== undefined && input.shelf !== '' && !isShelf(input.shelf)) throw new LibraryError('bad_request', '분류는 프로젝트, 개념, 작업 기록, 출처만 됩니다.');
     if (input.taskId && !this.access.hasTask(input.taskId)) throw new LibraryError('not_found', '이 마을에 없는 과제입니다.');
     if (input.sessionId && !this.access.hasSession(input.sessionId)) throw new LibraryError('not_found', '이 마을에 없는 세션입니다.');
     const limit = clampLimit(input.limit, SEARCH_LIMIT);
@@ -420,6 +660,7 @@ export class Library {
     const ranked = this.data.nodes
       .filter((node) => node.villageId === villageId)
       .filter((node) => !input.kind || node.kind === input.kind)
+      .filter((node) => !input.shelf || node.shelf === input.shelf)
       .filter((node) => !input.taskId || node.taskId === input.taskId)
       .filter((node) => !input.sessionId || node.sessionId === input.sessionId)
       .map((node) => ({ node, score: scoreNode(node, parts, query.toLowerCase()) }))
@@ -494,7 +735,11 @@ export class Library {
   }
 
   private panel(mode: LibraryPanel['mode'], cards: LibraryCard[], edges: LibraryPanel['edges'], query?: string): LibraryPanel {
-    const base = { mode, cards, edges, ...(query ? { query } : {}) };
+    const graph = layoutGraph(
+      cards.map((card) => ({ id: card.id, label: `${organizeLabel(card)} ${card.title}` })),
+      edges,
+    );
+    const base = { mode, cards, edges, graph, ...(query ? { query } : {}) };
     return { ...base, notice: LIBRARY_NOTICE, executable: false, text: formatPanel(base) };
   }
 

@@ -36,6 +36,12 @@ node tools/deploy-msw-overlay.mjs C:\path\to\the\exported\LocalWorkspace
 
 `npm run sim`은 이 프로세스 안에서 목표를 끝까지 진행합니다. 메이플 세션을 열지 않고 Claude를 호출하지 않습니다.
 
+요구가 바뀌었습니다. 끝난 세션의 짧은 작업 기록은 그 마을 저장소에 그래프로 남습니다. 재시작 후에도 `kn_` id가 같습니다. 세션이 만든 연결은 `proposed`이고 사실이 아닙니다. 출처 문장은 여전히 명시적으로 올릴 때만 생깁니다. 지운 기록은 같은 내용이 다시 자동으로 들어오지 않습니다. 비밀 문자열 걸러내기는 완전하지 않습니다. 보이는 패턴만 `[가림]`으로 바꿉니다.
+
+버튼이 기본 채팅만 연 원인은 아직 확정하지 않았습니다. 보이는 버튼과 입력을 받는 버튼은 다를 수 있습니다. 지금 스크립트는 버튼 UUID로 `ConnectEvent(ButtonClickEvent)`를 걸고, 핸들러는 ClientOnly입니다. UI 갱신은 서버에서 `/ui`를 찾지 않고, 맵 엔티티의 ClientOnly 메서드로 넘깁니다. 맵 터치는 TouchReceiveComponent의 `[self]` TouchEvent이고 UITouchDownEvent와 바꾸지 않습니다. 이 연결은 크리에이터에서 다시 확인하지 않았습니다. 슬래시 명령은 쓰지 않습니다. 읽은 범위는 [creator-sources.md](creator-sources.md)입니다. 꾸미기 대기는 [polish-backlog.md](polish-backlog.md)입니다.
+
+게시판은 피드에 있는 목표, 질문, 시스템 문장만 보여 줍니다. 바꾼 파일이나 테스트 결과를 만들어 넣지 않습니다. NPC와 책은 공식 빌더의 기본 스프라이트입니다. 캐릭터 스킨 RUID는 확인된 목록에 없어 넣지 않았습니다.
+
 첫 크리에이터 플레이에서 서버 로그는 `cannot set WorldToken, no such field (at /maps/map01/VillageRelay)`였습니다. 공식 UI 런타임 문서는 선언하지 않은 `self` 대입이 그 오류로 메서드를 멈춘다고 적습니다. `.codeblock`은 메이커 refresh가 `.mlua`에서 만들고, 이 저장소는 그 파일을 쓰지 않습니다. 스크립트가 `OnBeginPlay`까지 실행되었으므로 빠진 것은 WorldToken 프로퍼티 선언입니다. `WorldToken`, `ClockOffset`, `OpenDecisionId`, `Busy`, `Cursor`, `CommandCounter`를 프로퍼티로 선언했습니다. `@Sync`는 붙이지 않았고, 시작할 때 토큰을 비웁니다.
 
 지휘석과 도서관 패널은 닫힌 채로 두고, `지휘석`과 `도서관` 버튼으로 하나씩 엽니다. 버튼 높이는 88이고 다음 칸과 겹치지 않게 간격을 두었습니다. 상태 문구는 `공개 릴레이가 없습니다.`입니다. 공개 HTTPS가 없으므로 `마을 연결 전`이라고 쓰지 않습니다.

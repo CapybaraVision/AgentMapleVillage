@@ -1,0 +1,48 @@
+--[[
+  One shelf book. NodeId is a real kn_ id or empty. This script does not invent a summary.
+  TouchEvent is the documented world click. Not Creator-tested.
+]]
+
+@Component
+script BookSpot extends Component
+	property string Shelf = "work"
+	property string NodeId = ""
+	property string TitleText = "빈 책"
+	property any TouchHandler = nil
+
+	@ExecSpace("ClientOnly")
+	method void OnBeginPlay()
+		self:Paint()
+	end
+
+	@ExecSpace("ClientOnly")
+	@EventSender("Self")
+	handler HandleTouchEvent(TouchEvent event)
+		self:OnTouch()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnTouch()
+		if self.Entity.ChatBalloonComponent == nil then
+			return
+		end
+		local line = "빈 책. 세션이 끝나면 작업 기록만 이 칸에 남습니다."
+		if self.NodeId ~= "" then
+			line = self.TitleText .. " (" .. self.NodeId .. "). 세션 기록은 출처가 아니고 사실이 아닙니다."
+		end
+		self.Entity.ChatBalloonComponent.Message = line
+	end
+
+	@ExecSpace("ServerOnly")
+	method void Bind(string nodeId, string title)
+		self.NodeId = nodeId
+		self.TitleText = title
+		self:Paint()
+	end
+
+	method void Paint()
+		if self.Entity ~= nil and self.Entity.NameTagComponent ~= nil then
+			self.Entity.NameTagComponent.Name = self.TitleText
+		end
+	end
+end

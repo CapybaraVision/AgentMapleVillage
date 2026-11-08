@@ -166,7 +166,10 @@ describe('knowledge graph', () => {
     const decisionId = done.snapshot.decisions[0]!.id;
     await done.apply('a', 'decision.answer', { decisionId, option: '이대로 진행' });
     expect(done.snapshot.goals[0]?.status).toBe('done');
-    expect(done.snapshot.library.nodes).toEqual([]);
+    const captured = done.snapshot.library.nodes;
+    expect(captured).toHaveLength(1);
+    expect(captured[0]).toMatchObject({ kind: 'summary', shelf: 'work', assertsFact: false });
+    expect(captured.some((node) => node.kind === 'source')).toBe(false);
   });
 });
 
@@ -289,5 +292,28 @@ describe('presentation scaffold', () => {
     });
     expect(stoppedWalking.doneBadge).toBe(false);
     expect(stoppedWalking.stateLabel).toBe('대기');
+  });
+
+  it('keeps a finished session as a private work node and does not restore it after retract', async () => {
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'amv-lib-')), 'state.json');
+    const room = Office.create({ backend: simBackend(), file, villageId: 'vil_alpha' });
+    await room.apply('goal-1', 'goal.submit', { text: '게시판 정리 sk-ant-secretvalue' });
+    const decisionId = room.snapshot.decisions[0]!.id;
+    await room.apply('answer-1', 'decision.answer', { decisionId, option: '이대로 진행' });
+    const node = room.snapshot.library.nodes.find((item) => item.kind === 'summary');
+    expect(node).toMatchObject({ shelf: 'work', assertion: 'summary', assertsFact: false, sessionId: DEFAULT_WORKER_SESSION, revision: 1 });
+    expect(node?.body).toContain('사실로 단정하지 않습니다');
+    expect(node?.body).not.toContain('sk-ant-secretvalue');
+    expect(node?.title).not.toContain('sk-ant-secretvalue');
+    expect(room.snapshot.library.edges.some((edge) => edge.status === 'proposed' && edge.assertsFact === false) || room.snapshot.library.edges.length === 0).toBe(true);
+    const again = Office.load({ file, backend: simBackend() });
+    expect(again.snapshot.library.nodes.map((item) => item.id)).toContain(node!.id);
+    await again.apply('retract-1', 'library.retract', { explicit: true, nodeId: node!.id });
+    expect(again.snapshot.library.nodes.some((item) => item.id === node!.id)).toBe(false);
+    await again.apply('goal-2', 'goal.submit', { text: '게시판 정리 sk-ant-secretvalue' });
+    const second = again.snapshot.decisions.find((item) => item.status === 'open');
+    await again.apply('answer-2', 'decision.answer', { decisionId: second!.id, option: '이대로 진행' });
+    expect(again.snapshot.library.nodes.some((item) => item.kind === 'summary')).toBe(false);
+    await expect(again.apply('pub', 'library.publish', { kind: 'source', title: '숨김', body: '본문', sourceLabel: '메모' })).rejects.toMatchObject({ code: 'denied' });
   });
 });

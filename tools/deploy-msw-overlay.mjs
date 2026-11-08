@@ -14,8 +14,8 @@ import { fileURLToPath } from 'node:url';
 
 const MAP_ID = 'map://AgentMapleVillage';
 const OVERLAY_ROOT = '/maps/AgentMapleVillage';
-const VILLAGE_ENTITIES = ['Desk1', 'Desk2', 'Desk3', 'Desk4', 'Desk5', 'Desk6', 'Foreman', 'Worker', 'VillageRelay'];
-const SCRIPT_FILES = ['VillageRelay.mlua', 'OfficeNpc.mlua', 'GoalDesk.mlua', 'LibraryHall.mlua'];
+const VILLAGE_ENTITIES = ['Desk1', 'Desk2', 'Desk3', 'Desk4', 'Desk5', 'Desk6', 'Foreman', 'Worker', 'VillageRelay', 'Guide', 'NoticeBoard', 'BookWork', 'BookSource'];
+const SCRIPT_FILES = ['VillageRelay.mlua', 'OfficeNpc.mlua', 'GoalDesk.mlua', 'LibraryHall.mlua', 'OfficeStatus.mlua', 'BookSpot.mlua', 'NoticeBoard.mlua', 'GuidePost.mlua'];
 const UI_FILES = ['AgentMapleDesk.ui', 'AgentMapleLibrary.ui'];
 const BODY_BY_MODE = {
   0: 'MOD.Core.RigidbodyComponent',
@@ -266,7 +266,35 @@ function mergeVillageOntoMap(mapJson, overlay, targetRoot, mode) {
     existingPaths.add(nextPath);
   }
   fillMissingScriptProperties(entities);
+  ensureNpcTouch(entities);
   return merged;
+}
+
+function ensureNpcTouch(entities) {
+  for (const entity of entities) {
+    const asString = typeof entity.jsonString === 'string';
+    const js = entityJson(entity);
+    const name = js.name || String(js.path || '').split('/').pop();
+    if (name !== 'Foreman' && name !== 'Worker') continue;
+    const components = js['@components'] ?? [];
+    let changed = false;
+    if (!components.some((component) => component['@type'] === 'MOD.Core.TouchReceiveComponent')) {
+      components.push({ '@type': 'MOD.Core.TouchReceiveComponent', Enable: true });
+      changed = true;
+    }
+    if (!components.some((component) => component['@type'] === 'script.OfficeStatus')) {
+      components.push({
+        '@type': 'script.OfficeStatus',
+        Enable: true,
+        StatusLine: '릴레이에 붙어 있지 않습니다. 진행 중으로 표시하지 않습니다.',
+      });
+      changed = true;
+    }
+    if (!changed) continue;
+    js['@components'] = components;
+    entity.componentNames = components.map((component) => component['@type']).filter(Boolean).join(',');
+    entity.jsonString = asString ? JSON.stringify(js) : js;
+  }
 }
 
 function fillMissingScriptProperties(entities) {

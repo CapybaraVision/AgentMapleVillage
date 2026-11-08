@@ -9,7 +9,7 @@ describe('msw script contract', () => {
   const files = fs.readdirSync(root).filter((file) => file.endsWith('.mlua'));
 
   it('ships script sources and not a fabricated world package', () => {
-    expect(files.sort()).toEqual(['GoalDesk.mlua', 'LibraryHall.mlua', 'OfficeNpc.mlua', 'VillageRelay.mlua']);
+    expect(files.sort()).toEqual(['BookSpot.mlua', 'GoalDesk.mlua', 'GuidePost.mlua', 'LibraryHall.mlua', 'NoticeBoard.mlua', 'OfficeNpc.mlua', 'OfficeStatus.mlua', 'VillageRelay.mlua']);
     const packaged = fs.readdirSync(path.resolve(root, '..', '..')).filter((file) => file.endsWith('.modpackage'));
     expect(packaged).toEqual([]);
   });
@@ -40,6 +40,10 @@ describe('msw script contract', () => {
     expect(npc).not.toContain('if self.OwnerUserId == "" then\n\t\t\tself.OwnerUserId = event.UserId');
     expect(hall).not.toContain('documentVersion');
     expect(desk).toContain('질문이 오면 여기에 표시됩니다.');
+    expect(desk).toContain('ConnectEvent(ButtonClickEvent');
+    expect(desk).not.toContain('@EventSender("Entity"');
+    expect(hall).toContain('ConnectEvent(ButtonClickEvent');
+    expect(hall).not.toContain('@EventSender("Entity"');
     const code = all.replace(/--\[\[[\s\S]*?\]\]/g, '').replace(/--.*$/gm, '');
     expect(code).not.toMatch(/WebSocket|websocket|os\.execute|io\.popen|RequestAndWait|RUID|\.modpackage/);
     expect(all).toContain('UNVERIFIED');

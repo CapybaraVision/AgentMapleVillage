@@ -1,0 +1,29 @@
+--[[
+  Client click on a map NPC. TouchEvent is the world event named by the official entity note.
+  ButtonClickEvent is UI-only and is not used here. Not Creator-tested.
+]]
+
+@Component
+script OfficeStatus extends Component
+	property string StatusLine = "릴레이에 붙어 있지 않습니다. 진행 중으로 표시하지 않습니다."
+	property any TouchHandler = nil
+
+	@ExecSpace("ClientOnly")
+	@EventSender("Self")
+	handler HandleTouchEvent(TouchEvent event)
+		-- Official TouchReceiveComponent example: Event Handler [self], Space Client.
+		self:OnTouch()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnTouch()
+		if self.Entity.ChatBalloonComponent == nil then
+			return
+		end
+		local name = ""
+		if self.Entity.NameTagComponent ~= nil then
+			name = self.Entity.NameTagComponent.Name .. "\n"
+		end
+		self.Entity.ChatBalloonComponent.Message = name .. self.StatusLine
+	end
+end

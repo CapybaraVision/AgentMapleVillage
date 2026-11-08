@@ -32,7 +32,7 @@ const scriptSrc = path.join(repoRoot, 'msw/scripts');
 fs.rmSync(outRoot, { recursive: true, force: true });
 const scriptOut = path.join(outRoot, 'RootDesk/MyDesk/AgentMapleVillage');
 fs.mkdirSync(scriptOut, { recursive: true });
-for (const name of ['VillageRelay.mlua', 'OfficeNpc.mlua', 'GoalDesk.mlua', 'LibraryHall.mlua']) {
+for (const name of ['VillageRelay.mlua', 'OfficeNpc.mlua', 'GoalDesk.mlua', 'LibraryHall.mlua', 'OfficeStatus.mlua', 'BookSpot.mlua', 'NoticeBoard.mlua', 'GuidePost.mlua']) {
   fs.copyFileSync(path.join(scriptSrc, name), path.join(scriptOut, name));
 }
 
@@ -71,6 +71,32 @@ function placeNpc(name, x, sessionId, slot) {
 
 placeNpc('Foreman', desks[0], 'ses_foreman', 'S01');
 placeNpc('Worker', desks[1], 'ses_worker', 'S02');
+for (const name of ['Foreman', 'Worker']) {
+  map.upsertComponent(name, 'MOD.Core.TouchReceiveComponent', { Enable: true });
+  map.upsertComponent(name, 'script.OfficeStatus', {
+    Enable: true,
+    StatusLine: '릴레이에 붙어 있지 않습니다. 진행 중으로 표시하지 않습니다.',
+  });
+}
+map.sprite('Guide', { pos: [0, floorY + 0.8, 0] });
+map.upsertComponent('Guide', 'MOD.Core.NameTagComponent', { Enable: true, Name: '안내' });
+map.upsertComponent('Guide', 'MOD.Core.ChatBalloonComponent', { Enable: true });
+map.upsertComponent('Guide', 'script.GuidePost', { Enable: true });
+map.sprite('NoticeBoard', { pos: [2.2, floorY + 0.6, 0] });
+map.upsertComponent('NoticeBoard', 'MOD.Core.NameTagComponent', { Enable: true, Name: '게시판' });
+map.upsertComponent('NoticeBoard', 'MOD.Core.ChatBalloonComponent', { Enable: true });
+map.upsertComponent('NoticeBoard', 'MOD.Core.TouchReceiveComponent', { Enable: true });
+map.upsertComponent('NoticeBoard', 'script.NoticeBoard', { Enable: true });
+for (const book of [
+  ['BookWork', 4, '빈 작업 책', 'work'],
+  ['BookSource', 5.4, '빈 출처 책', 'source'],
+]) {
+  map.sprite(book[0], { pos: [book[1], floorY + 0.8, 0] });
+  map.upsertComponent(book[0], 'MOD.Core.NameTagComponent', { Enable: true, Name: book[2] });
+  map.upsertComponent(book[0], 'MOD.Core.ChatBalloonComponent', { Enable: true });
+  map.upsertComponent(book[0], 'MOD.Core.TouchReceiveComponent', { Enable: true });
+  map.upsertComponent(book[0], 'script.BookSpot', { Enable: true, Shelf: book[3], NodeId: '', TitleText: book[2] });
+}
 map.empty('VillageRelay', { pos: [0, 2, 0], scripts: ['script.VillageRelay'] });
 map.upsertComponent('VillageRelay', 'script.VillageRelay', {
   Enable: true,
@@ -137,7 +163,18 @@ deskRows.button('GoalButton', '목표 보내기');
 deskRows.pair('AcceptButton', '이대로 진행', 'DenyButton', '거절');
 desk.script('GoalDesk', 'script.GoalDesk', { anchor: 'stretch', pos: [0, 0], rect_size: [1920, 1080] });
 fs.mkdirSync(path.join(outRoot, 'ui'), { recursive: true });
-desk.write(path.join(outRoot, 'ui/AgentMapleDesk.ui'));
+desk.write(path.join(outRoot, 'ui/AgentMapleDesk.ui'), {
+  bind: {
+    mlua: path.join(scriptOut, 'GoalDesk.mlua'),
+    props: {
+      OpenButton: '/ui/AgentMapleDesk/OpenButton',
+      PairButton: '/ui/AgentMapleDesk/Board/PairButton',
+      GoalButton: '/ui/AgentMapleDesk/Board/GoalButton',
+      AcceptButton: '/ui/AgentMapleDesk/Board/AcceptButton',
+      DenyButton: '/ui/AgentMapleDesk/Board/DenyButton',
+    },
+  },
+});
 
 const library = new UIBuilder('AgentMapleLibrary');
 library.button('OpenButton', '도서관', { anchor: 'middle-right', pos: [-24, 300], rect_size: [160, 88], ...buttonPaint });
@@ -162,7 +199,21 @@ libraryRight.button('LinkButton', '연결 제안');
 libraryRight.input('EdgeInput', 'ke_ 번호');
 libraryRight.button('ApproveButton', '연결 승인');
 library.script('LibraryHall', 'script.LibraryHall', { anchor: 'stretch', pos: [0, 0], rect_size: [1920, 1080] });
-library.write(path.join(outRoot, 'ui/AgentMapleLibrary.ui'));
+library.write(path.join(outRoot, 'ui/AgentMapleLibrary.ui'), {
+  bind: {
+    mlua: path.join(scriptOut, 'LibraryHall.mlua'),
+    props: {
+      OpenButton: '/ui/AgentMapleLibrary/OpenButton',
+      SearchButton: '/ui/AgentMapleLibrary/Board/SearchButton',
+      ReadButton: '/ui/AgentMapleLibrary/Board/ReadButton',
+      NeighborButton: '/ui/AgentMapleLibrary/Board/NeighborButton',
+      PublishSourceButton: '/ui/AgentMapleLibrary/Board/PublishSourceButton',
+      PublishSummaryButton: '/ui/AgentMapleLibrary/Board/PublishSummaryButton',
+      LinkButton: '/ui/AgentMapleLibrary/Board/LinkButton',
+      ApproveButton: '/ui/AgentMapleLibrary/Board/ApproveButton',
+    },
+  },
+});
 
 const skillCorpus = walkText(skillRoot);
 const overlayCorpus = walkText(outRoot);
