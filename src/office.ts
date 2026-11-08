@@ -19,6 +19,7 @@ import {
 import { fingerprint } from './json.js';
 import { readJson, writeJsonAtomic } from './persist.js';
 import type { SessionDriver, TurnResult } from './claude-driver.js';
+import { emptyLibrary, Library, LibraryError, type KnowledgeEdge, type KnowledgeNode, type LibraryPanel, type LibraryState } from './library.js';
 
 export interface Clock {
   now(): number;
@@ -28,7 +29,7 @@ export const systemClock: Clock = { now: () => Date.now() };
 
 export class OfficeError extends Error {
   constructor(
-    readonly code: 'bad_request' | 'conflict' | 'not_found' | 'denied',
+    readonly code: 'bad_request' | 'conflict' | 'not_found' | 'denied' | 'forbidden',
     message: string,
   ) {
     super(message);
@@ -59,6 +60,8 @@ export interface OfficeState {
   counters: { goal: number; task: number; decision: number; feed: number };
   phase: string;
   createdAt: number;
+  villageId: string;
+  library: LibraryState;
 }
 
 export interface WorkerContext {
@@ -68,6 +71,7 @@ export interface WorkerContext {
   goalText: string;
   sessionKey: string;
   claudeSessionId?: string;
+  referenceContext?: string;
 }
 
 export interface ContinueContext extends WorkerContext {
@@ -106,7 +110,7 @@ export function claudeBackend(driver: SessionDriver): WorkerBackend {
         intent: 'ask',
         sessionKey: ctx.sessionKey,
         ...(ctx.claudeSessionId ? { resumeSessionId: ctx.claudeSessionId } : {}),
-        prompt: `Goal:\n${ctx.goalText}\nAsk the owner to confirm the scope before writing files.`,
+        prompt: withReference(`Goal:\n${ctx.goalText}\nAsk the owner to confirm the scope before writing files.`, ctx.referenceContext),
         approve: async () => 'deny',
       });
       if (turn.denied) return { denied: true, reason: turn.reason ?? 'denied', ...(turn.sessionId ? { claudeSessionId: turn.sessionId } : {}) };
@@ -121,7 +125,7 @@ export function claudeBackend(driver: SessionDriver): WorkerBackend {
         intent: 'work',
         sessionKey: ctx.sessionKey,
         ...(ctx.claudeSessionId ? { resumeSessionId: ctx.claudeSessionId } : {}),
-        prompt: `Goal:\n${ctx.goalText}\nOwner answer: ${ctx.answer.option ?? ''} ${ctx.answer.text ?? ''}`.trim(),
+        prompt: withReference(`Goal:\n${ctx.goalText}\nOwner answer: ${ctx.answer.option ?? ''} ${ctx.answer.text ?? ''}`.trim(), ctx.referenceContext),
         approve: async (request) => {
           if (!request.writes) return 'allow';
           return ctx.answer.option === '이대로 진행' ? 'allow' : 'deny';
@@ -167,7 +171,7 @@ function defaultCharacters(): Character[] {
   ];
 }
 
-function emptyState(backend: 'sim' | 'claude', now: number): OfficeState {
+function emptyState(backend: 'sim' | 'claude', now: number, villageId = ''): OfficeState {
   return {
     version: 1,
     backend,
@@ -181,7 +185,14 @@ function emptyState(backend: 'sim' | 'claude', now: number): OfficeState {
     counters: { goal: 0, task: 0, decision: 0, feed: 0 },
     phase: 'idle',
     createdAt: now,
+    villageId,
+    library: emptyLibrary(villageId),
   };
+}
+
+function withReference(prompt: string, referenceContext?: string): string {
+  if (!referenceContext) return prompt;
+  return `${prompt}\n\n${referenceContext}`;
 }
 
 export class Office {
@@ -192,9 +203,10 @@ export class Office {
     private file?: string,
   ) {}
 
-  static create(opts: { backend: WorkerBackend; clock?: Clock; file?: string }): Office {
+  static create(opts: { backend: WorkerBackend; clock?: Clock; file?: string; villageId?: string }): Office {
     const clock = opts.clock ?? systemClock;
-    const office = new Office(emptyState(opts.backend.id, clock.now()), opts.backend, clock, opts.file);
+    const office = new Office(emptyState(opts.backend.id, clock.now(), opts.villageId ?? ''), opts.backend, clock, opts.file);
+    if (opts.villageId) office.bindVillage(opts.villageId);
     office.save();
     return office;
   }
@@ -204,8 +216,24 @@ export class Office {
     const saved = readJson<OfficeState>(opts.file);
     if (!saved) return Office.create({ backend: opts.backend, clock, file: opts.file });
     if (saved.version !== 1) throw new OfficeError('bad_request', 'unsupported office state version');
-    saved.backend = opts.backend.id;
-    return new Office(saved, opts.backend, clock, opts.file);
+    const loose = saved as OfficeState & { library?: LibraryState; villageId?: string };
+    if (!loose.villageId) loose.villageId = '';
+    if (!loose.library) loose.library = emptyLibrary(loose.villageId);
+    loose.backend = opts.backend.id;
+    return new Office(loose, opts.backend, clock, opts.file);
+  }
+
+  bindVillage(villageId: string): void {
+    if (!/^vil_[A-Za-z0-9_-]{4,64}$/.test(villageId)) throw new OfficeError('bad_request', 'invalid villageId');
+    if (this.state.villageId && this.state.villageId !== villageId) {
+      throw new OfficeError('conflict', 'profile is already bound to another village');
+    }
+    if (this.state.library.nodes.some((node) => node.villageId && node.villageId !== villageId)) {
+      throw new OfficeError('conflict', 'library is already bound to another village');
+    }
+    this.state.villageId = villageId;
+    this.state.library.villageId = villageId;
+    this.save();
   }
 
   get snapshot(): OfficeState {
@@ -242,7 +270,117 @@ export class Office {
     if (type === 'character.bind') return this.bindCharacter(payload);
     if (type === 'goal.submit') return this.submitGoal(payload);
     if (type === 'decision.answer') return this.answer(payload);
+    if (type.startsWith('library.')) return this.libraryCommand(type, payload);
     throw new OfficeError('denied', `command type ${type} is not handled locally`);
+  }
+
+  private library(): Library {
+    return new Library(this.state.library, this.clock, {
+      villageId: () => this.state.villageId,
+      hasSession: (sessionId) => this.state.characters.some((item) => item.sessionId === sessionId),
+      hasTask: (taskId) => this.state.tasks.some((item) => item.id === taskId),
+    });
+  }
+
+  private libraryCommand(type: string, payload: Record<string, unknown>): ApplyResult {
+    if (Array.isArray(payload.entries) || Array.isArray(payload.nodes) || Array.isArray(payload.edges)) {
+      throw new OfficeError('denied', '도서관에는 한 건씩만 올릴 수 있습니다.');
+    }
+    const now = this.clock.now();
+    try {
+      if (type === 'library.publish') {
+        const before = this.state.library.edges.length;
+        const published = this.library().publish({
+          explicit: payload.explicit === true,
+          kind: payload.kind as 'source' | 'summary',
+          title: stringField(payload, 'title'),
+          body: stringField(payload, 'body'),
+          authorRole: payload.authorRole === 'session' ? 'session' : 'user',
+          authorId: typeof payload.authorId === 'string' ? payload.authorId : 'user',
+          ...(typeof payload.sessionId === 'string' ? { sessionId: payload.sessionId } : {}),
+          ...(typeof payload.taskId === 'string' ? { taskId: payload.taskId } : {}),
+          ...(typeof payload.sourceLabel === 'string' ? { sourceLabel: payload.sourceLabel } : {}),
+          ...(typeof payload.locator === 'string' ? { locator: payload.locator } : {}),
+          ...(typeof payload.groundedNodeId === 'string' ? { groundedNodeId: payload.groundedNodeId } : {}),
+          ...(typeof payload.villageId === 'string' ? { villageId: payload.villageId } : {}),
+        });
+        const edges = this.state.library.edges.slice(before);
+        return {
+          result: { nodeId: published.node.id, contentDuplicate: published.contentDuplicate, assertsFact: false },
+          events: [this.libraryNodeEvent(published.node, now), ...edges.map((edge) => this.libraryEdgeEvent(edge, now))],
+        };
+      }
+      if (type === 'library.revise') {
+        const node = this.library().revise({
+          explicit: payload.explicit === true,
+          nodeId: stringField(payload, 'nodeId'),
+          ...(typeof payload.title === 'string' ? { title: payload.title } : {}),
+          ...(typeof payload.body === 'string' ? { body: payload.body } : {}),
+          authorRole: payload.authorRole === 'session' ? 'session' : 'user',
+          authorId: typeof payload.authorId === 'string' ? payload.authorId : 'user',
+          ...(typeof payload.sessionId === 'string' ? { sessionId: payload.sessionId } : {}),
+          ...(typeof payload.villageId === 'string' ? { villageId: payload.villageId } : {}),
+        });
+        return { result: { nodeId: node.id, revision: node.revision, assertsFact: false }, events: [this.libraryNodeEvent(node, now)] };
+      }
+      if (type === 'library.link') {
+        const linked = this.library().link({
+          explicit: payload.explicit === true,
+          fromId: stringField(payload, 'fromId'),
+          toId: stringField(payload, 'toId'),
+          ...(typeof payload.note === 'string' ? { note: payload.note } : {}),
+          authorRole: payload.authorRole === 'session' ? 'session' : 'user',
+          authorId: typeof payload.authorId === 'string' ? payload.authorId : 'user',
+          ...(typeof payload.sessionId === 'string' ? { sessionId: payload.sessionId } : {}),
+          ...(typeof payload.villageId === 'string' ? { villageId: payload.villageId } : {}),
+        });
+        return {
+          result: { edgeId: linked.edge.id, contentDuplicate: linked.contentDuplicate, status: linked.edge.status, assertsFact: false },
+          events: [this.libraryEdgeEvent(linked.edge, now)],
+        };
+      }
+      if (type === 'library.approveLink') {
+        const approved = this.library().approveLink({
+          explicit: payload.explicit === true,
+          edgeId: stringField(payload, 'edgeId'),
+          ...(typeof payload.villageId === 'string' ? { villageId: payload.villageId } : {}),
+        });
+        return {
+          result: { edgeId: approved.edge.id, alreadyApproved: approved.alreadyApproved, assertsFact: false },
+          events: [this.libraryEdgeEvent(approved.edge, now)],
+        };
+      }
+      if (type === 'library.search' || type === 'library.read' || type === 'library.neighbors') {
+        const panel = this.libraryPanel(type, payload);
+        return { result: { mode: panel.mode, count: panel.cards.length, executable: false }, events: [this.libraryPanelEvent(panel, now)] };
+      }
+    } catch (error) {
+      if (error instanceof LibraryError) throw new OfficeError(error.code, error.message);
+      throw error;
+    }
+    throw new OfficeError('denied', `command type ${type} is not handled locally`);
+  }
+
+  private libraryPanel(type: string, payload: Record<string, unknown>): LibraryPanel {
+    const villageId = typeof payload.villageId === 'string' ? payload.villageId : undefined;
+    if (type === 'library.search') {
+      return this.library().search({
+        query: stringField(payload, 'query'),
+        ...(typeof payload.limit === 'number' ? { limit: payload.limit } : {}),
+        ...(typeof payload.kind === 'string' ? { kind: payload.kind } : {}),
+        ...(typeof payload.taskId === 'string' ? { taskId: payload.taskId } : {}),
+        ...(typeof payload.sessionId === 'string' ? { sessionId: payload.sessionId } : {}),
+        ...(villageId ? { villageId } : {}),
+      });
+    }
+    if (type === 'library.read') return this.library().read({ nodeId: stringField(payload, 'nodeId'), ...(villageId ? { villageId } : {}) }).panel;
+    return this.library().neighbors({
+      nodeId: stringField(payload, 'nodeId'),
+      ...(typeof payload.depth === 'number' ? { depth: payload.depth } : {}),
+      ...(typeof payload.limit === 'number' ? { limit: payload.limit } : {}),
+      ...(typeof payload.status === 'string' ? { status: payload.status } : {}),
+      ...(villageId ? { villageId } : {}),
+    });
   }
 
   private bindCharacter(payload: Record<string, unknown>): ApplyResult {
@@ -326,6 +464,7 @@ export class Office {
 
     const sessionKey = `${sessionId}:${taskId}`;
     const record = this.sessionRecord(sessionKey);
+    const reference = this.library().referenceFor(text, taskId);
     const started = await this.backend.startTask({
       sessionId,
       taskId,
@@ -333,6 +472,7 @@ export class Office {
       goalText: text,
       sessionKey,
       ...(record.claudeSessionId ? { claudeSessionId: record.claudeSessionId } : {}),
+      ...(reference.text ? { referenceContext: reference.text } : {}),
     });
     this.rememberSession(sessionKey, started.claudeSessionId);
 
@@ -409,6 +549,7 @@ export class Office {
 
     const sessionKey = `${decision.sessionId}:${decision.taskId}`;
     const record = this.sessionRecord(sessionKey);
+    const reference = this.library().referenceFor(goal.text, decision.taskId);
     const continued = await this.backend.continueTask({
       sessionId: decision.sessionId,
       taskId: decision.taskId,
@@ -416,6 +557,7 @@ export class Office {
       goalText: goal.text,
       sessionKey,
       ...(record.claudeSessionId ? { claudeSessionId: record.claudeSessionId } : {}),
+      ...(reference.text ? { referenceContext: reference.text } : {}),
       answer: { ...(option ? { option } : {}), ...(text ? { text } : {}) },
     });
     this.rememberSession(sessionKey, continued.claudeSessionId);
@@ -527,6 +669,70 @@ export class Office {
       payload: { phase: this.state.phase, backend: this.state.backend },
     };
   }
+
+  private libraryNodeEvent(node: KnowledgeNode, ts: number): DomainEvent {
+    return {
+      eventId: '',
+      type: 'library.node',
+      ...(node.sessionId ? { sessionId: node.sessionId } : {}),
+      ts,
+      payload: {
+        id: node.id,
+        villageId: node.villageId,
+        kind: node.kind,
+        kindLabel: node.kind === 'source' ? '출처 기록' : '세션 요약',
+        title: node.title,
+        snippet: node.body.slice(0, 140),
+        assertion: node.assertion,
+        assertsFact: false,
+        revision: node.revision,
+        ...(node.taskId ? { taskId: node.taskId } : {}),
+        ...(node.sessionId ? { sessionId: node.sessionId } : {}),
+        ...(node.sourceLabel ? { sourceLabel: node.sourceLabel } : {}),
+      },
+    };
+  }
+
+  private libraryEdgeEvent(edge: KnowledgeEdge, ts: number): DomainEvent {
+    return {
+      eventId: '',
+      type: 'library.edge',
+      ts,
+      payload: {
+        id: edge.id,
+        villageId: edge.villageId,
+        fromId: edge.fromId,
+        toId: edge.toId,
+        kind: edge.kind,
+        status: edge.status,
+        statusLabel: edge.status === 'approved' ? '승인한 연결' : '제안된 연결',
+        assertsFact: false,
+      },
+    };
+  }
+
+  private libraryPanelEvent(panel: LibraryPanel, ts: number): DomainEvent {
+    return {
+      eventId: '',
+      type: 'library.panel',
+      ts,
+      payload: {
+        mode: panel.mode,
+        notice: panel.notice,
+        text: panel.text,
+        executable: false,
+        cards: panel.cards,
+        edges: panel.edges,
+        ...(panel.query ? { query: panel.query } : {}),
+      },
+    };
+  }
+}
+
+function stringField(payload: Record<string, unknown>, key: string): string {
+  const value = payload[key];
+  if (typeof value !== 'string') throw new OfficeError('bad_request', `${key} is required`);
+  return value;
 }
 
 function requiredString(payload: Record<string, unknown>, key: string): string {

@@ -19,6 +19,14 @@
 11. UI 엔티티는 서버에서 직접 만지지 않습니다. 서버는 `GoalDesk:ShowFromServer`를 호출합니다. 이 호출이 클라이언트에서 실행되는지는 크리에이터 실행 공간 규칙에 따라 확인해야 합니다.
 12. 폴링은 2초입니다. 월드의 다른 HttpService 호출과 합쳐 분당 120회를 넘기지 마세요. 넘기면 문서상 30초간 요청이 멈춥니다.
 
+## 도서관과 바닥
+
+`LibraryHall.mlua`를 UI에 붙이고, `VillageRelay.LibraryHallPath`를 그 엔티티로 지정합니다. 검색, 본문(`kn_` id), 이웃, 출처 기록 올리기, 세션 요약 올리기, 연결, 연결 승인이 버튼입니다. 항목을 골라도 본문이 명령으로 실행되지 않습니다.
+
+NPC는 시작할 때 서 있던 Y를 바닥으로 기억하고, 질문 중에는 플레이어의 X로만 이동합니다. `LibraryX`와 `SlotLabel`(S01, S02)은 크리에이터가 `config/village-anchors.json`과 맞춥니다. 개념도의 위아래 구역으로는 걷지 않습니다.
+
+이 배치와 스크립트는 월드에서 실행해 보지 않았습니다. `.modpackage`는 없습니다.
+
 ## 스크립트와 릴레이가 맞추는 이름
 
 - 명령 타입: `character.bind`, `goal.submit`, `decision.answer`

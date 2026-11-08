@@ -15,6 +15,8 @@ script OfficeNpc extends Component
 	property number DeskX = 0
 	property number DeskY = 0
 	property boolean DeskSaved = false
+	property string SlotLabel = ""
+	property number LibraryX = 0
 	property number MoveSpeed = 2.5
 
 	@ExecSpace("ServerOnly")
@@ -41,15 +43,17 @@ script OfficeNpc extends Component
 
 	@ExecSpace("ServerOnly")
 	method void Step(number delta)
+		-- One horizontal floor. Y stays on the desk line captured at start.
+		-- conceptY bands in the anchor manifest are not a path.
 		local targetX = self.DeskX
 		local targetY = self.DeskY
 		if self.Station == "user" and self.OwnerUserId ~= "" then
 			local userEntity = _UserService:GetUserEntityByUserId(self.OwnerUserId)
 			if userEntity ~= nil and userEntity.TransformComponent ~= nil then
-				local userPos = userEntity.TransformComponent.WorldPosition
-				targetX = userPos.x
-				targetY = userPos.y + 0.6
+				targetX = userEntity.TransformComponent.WorldPosition.x
 			end
+		elseif self.Station == "library" then
+			targetX = self.LibraryX
 		end
 		local pos = self.Entity.TransformComponent.WorldPosition
 		local dx = targetX - pos.x

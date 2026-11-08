@@ -12,6 +12,7 @@
 script VillageRelay extends Component
 	property string RelayBase = "https://relay.example/v1"
 	property string GoalDeskPath = "/ui/DefaultGroup/GoalDesk"
+	property string LibraryHallPath = "/ui/DefaultGroup/LibraryHall"
 	property string ForemanNpcPath = "/maps/default/ForemanNpc"
 	property string WorkerNpcPath = "/maps/default/WorkerNpc"
 	property string ForemanActorId = "npc-foreman"
@@ -182,6 +183,9 @@ script VillageRelay extends Component
 		if view.status ~= nil and view.status.phase ~= nil then
 			self:PushStatus("상태: " .. tostring(view.status.phase))
 		end
+		if view.library ~= nil and view.library.panel ~= nil and view.library.panel.text ~= nil then
+			self:PushLibrary(view.library.panel.text)
+		end
 	end
 
 	@ExecSpace("ServerOnly")
@@ -193,6 +197,8 @@ script VillageRelay extends Component
 			self:PushQuestion(event.payload.question)
 		elseif event.type == "goal.upsert" and event.payload ~= nil and event.payload.status == "done" then
 			self:PushResult("목표가 끝났습니다.")
+		elseif event.type == "library.panel" and event.payload ~= nil then
+			self:PushLibrary(event.payload.text or "")
 		end
 	end
 
@@ -214,7 +220,11 @@ script VillageRelay extends Component
 		npc.OfficeNpc.Station = character.station
 		npc.OfficeNpc.ActivityText = character.activity
 		if npc.NameTagComponent ~= nil then
-			npc.NameTagComponent.Name = character.displayName .. " · " .. character.activity
+			local slot = ""
+			if npc.OfficeNpc.SlotLabel ~= nil and npc.OfficeNpc.SlotLabel ~= "" then
+				slot = npc.OfficeNpc.SlotLabel .. " · "
+			end
+			npc.NameTagComponent.Name = character.displayName .. " · " .. slot .. character.activity
 		end
 		if npc.ChatBalloonComponent ~= nil and character.station == "user" then
 			npc.ChatBalloonComponent.Message = character.activity
@@ -234,6 +244,58 @@ script VillageRelay extends Component
 	@ExecSpace("ServerOnly")
 	method void PushResult(string text)
 		self:PushUi("result", text)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitLibrarySearch(string query)
+		self:SendLibrary("library.search", { query = query })
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitLibraryRead(string nodeId)
+		self:SendLibrary("library.read", { nodeId = nodeId })
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitLibraryNeighbors(string nodeId)
+		self:SendLibrary("library.neighbors", { nodeId = nodeId, depth = 1 })
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitLibraryPublish(string kind, string title, string body, string sourceLabel, string taskId)
+		local payload = { explicit = true, kind = kind, title = title, body = body, authorRole = "user", authorId = "user" }
+		if sourceLabel ~= nil and sourceLabel ~= "" then
+			payload.sourceLabel = sourceLabel
+		end
+		if taskId ~= nil and taskId ~= "" then
+			payload.taskId = taskId
+		end
+		self:SendLibrary("library.publish", payload)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitLibraryLink(string fromId, string toId)
+		self:SendLibrary("library.link", { explicit = true, fromId = fromId, toId = toId, authorRole = "user", authorId = "user" })
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitLibraryApprove(string edgeId)
+		self:SendLibrary("library.approveLink", { explicit = true, edgeId = edgeId })
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SendLibrary(string commandType, table payload)
+		self.CommandCounter = self.CommandCounter + 1
+		local commandId = "lib-" .. tostring(DateTime.UtcNow.Elapsed) .. "-" .. tostring(self.CommandCounter)
+		self:SendCommand(commandId, commandType, payload)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void PushLibrary(string text)
+		local hall = _EntityService:GetEntityByPath(self.LibraryHallPath)
+		if hall ~= nil and hall.LibraryHall ~= nil then
+			hall.LibraryHall:ShowFromServer(text)
+		end
 	end
 
 	@ExecSpace("ServerOnly")

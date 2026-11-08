@@ -13,7 +13,18 @@ export const DEFAULT_WORKER_SESSION = 'ses_worker';
 export const DEFAULT_FOREMAN_ACTOR = 'npc-foreman';
 export const DEFAULT_WORKER_ACTOR = 'npc-worker';
 
-export const WORLD_COMMANDS = ['goal.submit', 'decision.answer', 'character.bind'] as const;
+export const WORLD_COMMANDS = [
+  'goal.submit',
+  'decision.answer',
+  'character.bind',
+  'library.publish',
+  'library.revise',
+  'library.link',
+  'library.approveLink',
+  'library.search',
+  'library.read',
+  'library.neighbors',
+] as const;
 export type WorldCommandType = (typeof WORLD_COMMANDS)[number];
 
 /** Names that must never be queued, even if a client sends them. */
@@ -25,6 +36,9 @@ export const DENIED_COMMANDS = [
   'tool.run',
   'desktop.exec',
   'claude.exec',
+  'library.delete',
+  'library.ingest',
+  'library.bulk',
 ] as const;
 
 export const EVENT_TYPES = [
@@ -34,6 +48,9 @@ export const EVENT_TYPES = [
   'decision.upsert',
   'feed.add',
   'office.status',
+  'library.node',
+  'library.edge',
+  'library.panel',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -49,7 +66,7 @@ export type AgentState =
   | 'done'
   | 'error';
 
-export type Station = 'desk' | 'user' | 'lounge';
+export type Station = 'desk' | 'user' | 'lounge' | 'library';
 export type Role = 'lead' | 'worker';
 export type GoalStatus = 'planning' | 'active' | 'done' | 'failed' | 'cancelled';
 export type TaskStatus = 'todo' | 'doing' | 'review' | 'done' | 'blocked' | 'cancelled';
@@ -121,6 +138,26 @@ export interface AgentSessionRecord {
   updatedAt: number;
 }
 
+export interface LibraryViewEdge {
+  id: string;
+  fromId: string;
+  toId: string;
+  kind: string;
+  status: string;
+  statusLabel?: string;
+  assertsFact: false;
+}
+
+export interface LibraryViewCard {
+  id: string;
+  kind: string;
+  kindLabel?: string;
+  title: string;
+  snippet?: string;
+  assertion?: string;
+  assertsFact: false;
+}
+
 export interface OfficeView {
   characters: Character[];
   goals: Goal[];
@@ -128,6 +165,11 @@ export interface OfficeView {
   decisions: Decision[];
   feed: FeedItem[];
   status: { phase: string; backend: 'sim' | 'claude' };
+  library: {
+    nodes: LibraryViewCard[];
+    edges: LibraryViewEdge[];
+    panel?: { mode?: string; text?: string; notice?: string; executable: false };
+  };
 }
 
 export interface DomainEvent {
@@ -188,6 +230,7 @@ export function emptyView(backend: 'sim' | 'claude' = 'sim'): OfficeView {
     decisions: [],
     feed: [],
     status: { phase: 'empty', backend },
+    library: { nodes: [], edges: [] },
   };
 }
 
@@ -235,5 +278,28 @@ export function applyEvent(view: OfficeView, type: string, payload: Record<strin
     const status = payload as { phase?: string; backend?: 'sim' | 'claude' };
     if (typeof status.phase === 'string') view.status.phase = status.phase;
     if (status.backend === 'sim' || status.backend === 'claude') view.status.backend = status.backend;
+    return;
+  }
+  if (type === 'library.node') {
+    const card = payload as unknown as LibraryViewCard;
+    if (!card.id) return;
+    const index = view.library.nodes.findIndex((item) => item.id === card.id);
+    if (index >= 0) view.library.nodes[index] = card;
+    else view.library.nodes.push(card);
+    if (view.library.nodes.length > 40) view.library.nodes.splice(0, view.library.nodes.length - 40);
+    return;
+  }
+  if (type === 'library.edge') {
+    const edge = payload as unknown as LibraryViewEdge;
+    if (!edge.id) return;
+    const index = view.library.edges.findIndex((item) => item.id === edge.id);
+    if (index >= 0) view.library.edges[index] = edge;
+    else view.library.edges.push(edge);
+    if (view.library.edges.length > 80) view.library.edges.splice(0, view.library.edges.length - 80);
+    return;
+  }
+  if (type === 'library.panel') {
+    const panel = payload as { mode?: string; text?: string; notice?: string };
+    view.library.panel = { ...panel, executable: false };
   }
 }

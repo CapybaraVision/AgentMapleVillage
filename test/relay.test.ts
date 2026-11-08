@@ -58,7 +58,7 @@ describe('relay auth and routing', () => {
     const { relay, rootToken } = await boot({ clock });
     const created = await postJson<{ connectorToken: string; pairingCode: string }>(`${relay.url}/v1/villages`, {}, rootToken);
     const paired = await postJson<{ worldToken: string }>(`${relay.url}/v1/pair`, { pairingCode: created.pairingCode });
-    for (const type of ['shell.exec', 'git.push', 'tool.run', 'desktop.exec', 'claude.exec']) {
+    for (const type of ['shell.exec', 'git.push', 'tool.run', 'desktop.exec', 'claude.exec', 'library.delete', 'library.ingest', 'library.bulk']) {
       await expect(
         postJson(`${relay.url}/v1/commands`, { commandId: `bad-${type}`, type, issuedAt: clock.now(), payload: { cmd: 'rm -rf /' } }, paired.worldToken),
       ).rejects.toMatchObject({ status: 400, code: 'denied' });

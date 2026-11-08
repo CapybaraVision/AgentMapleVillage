@@ -14,7 +14,7 @@
 | 1 | 목표 제출. 상태 `planning/active/done/failed/cancelled` | 새 `goal.submit`. 실패는 거절 경로만. 취소는 없음 | 목표 입력 칸. 스크립트 미검증 | 구현 (시뮬 완료/실패). 취소는 계획 | 목표 하나가 질문이 열릴 때까지 가고, 승인 답이면 `done`, 거절이면 `failed`. 테스트가 확인 |
 | 2 | 과제 벽. 의존성, 재배정, 우선순위, CI | 세션당 과제 하나. 의존성/재배정/CI 없음 | 상태 문장만. 칸반 없음 | 구현 (단일 과제). 나머지 계획 | 과제 상태가 `doing`에서 `done` 또는 `blocked`로 바뀜 |
 | 3 | 리드/워커와 캐스트, 색, 스킨 | 고정 `ses_foreman`(감독관), `ses_worker`(작업자). 추가 워커는 `character.bind` | 이름표 문구. 스킨 에셋 없음 | 목업 | 역할이 바뀌지 않고, 액터 ID를 다른 세션에 묶으면 충돌 |
-| 4 | 상태 `idle`…`error`와 장소 `desk/library/terminal/testbench/mergestation/meeting/lounge/user` | `desk`와 `user`만 사용. 나머지는 이름만 문서화 | NPC `Station` | 구현 (상태 값). 이동은 미검증 | 질문 중 워커 `station=user`, 끝나면 `desk` |
+| 4 | 상태 `idle`…`error`와 장소 `desk/library/terminal/testbench/mergestation/meeting/lounge/user` | 실제 값은 `desk`와 `user`. `library`는 타입과 스크립트 분기에만 있고, 목표가 그곳으로 보내지는 않습니다. 나머지 장소는 앵커 이름 | 이름표는 서버 activity. 수평 이동만 | 상태 구현. 연출은 미검증 | 완료 배지는 과제와 세션이 둘 다 `done`일 때만. 클립 없음 |
 | 5 | `decision.kind=question`, 열린 질문이면 에이전트가 플레이어에게 이동 | 시뮬이 범위 확인 질문을 엽니다 | 질문 텍스트 | 구현 + UI 미검증 | 열린 `decisionId`가 생기고, 그 ID로만 답할 수 있음 |
 | 6 | 선택지 버튼과 자유 입력 | `이대로 진행` / `거절`. 자유 입력 필드도 프로토콜에 있음 | 두 버튼. 자유 입력 UI는 아직 없음 | 구현 (선택지). 자유 입력은 서버만 | 없는 선택지는 400. 테스트가 거절/승인을 둘 다 봄 |
 | 7 | 도구 권한 Allow once / Always / Deny. 정책 엔진이 명령줄을 분류 | 공개 릴레이에 정책 엔진을 올리지 않음. 로컬 드라이버가 쓰기 전에 `approve()` | 이 슬라이스의 질문이 승인 역할을 겸함. 별도 권한 카드는 없음 | 목업 | 거절 시 CLI `spawn` 호출 횟수 0. 목표는 완료되지 않음 |
@@ -25,7 +25,7 @@
 | 12 | `snapshot`, 웹소켓 재연결, 원자적 `state.json` | 이벤트 커서와 스냅샷/델타. 파일은 temp+fsync+rename | 커서 `afterEventSeq` | 구현 | 릴레이 재시작 후 이벤트 유지. 커서 되감아도 목표 1개 |
 | 13 | 백엔드 `sim` / `claude` / `codex` | 시뮬은 기본. Claude는 주입 드라이버. Codex 없음 | 상태의 `backend` 필드 | 시뮬 구현, Claude 목업, Codex 계획 | 시뮬 경로는 드라이버 호출 0. Claude 경로는 가짜 세션만 |
 | 14 | 에이전트 jsonl 로그, 모니터, 종류 `text/tool/result/error/diff` | 짧은 `feed`만. 파일 로그와 모니터 없음 | 상태 한 줄 | 계획 (피드 일부는 구현) | 로그 테일이 재시작 후에도 남고 UI에 줄 단위로 보임 |
-| 15 | 리드 계획, 마크다운 메모리, 도서관 | 없음 | 없음 | 계획 | 계획 문서가 다음 턴 프롬프트에 다시 들어감 |
+| 15 | 리드 계획, 마크다운 메모리, 도서관 | 계획은 없음. 도서관은 마을 JSON 그래프 (`kn_`/`ke_`, `revision`, `sourceLabel`) | `LibraryHall` 검색·본문·한 단계 이웃. 미검증 | 그래프 구현. 화면은 미검증. 마크다운 기억은 계획 | 명시적으로 올린 출처·요약만 저장. 제안 연결은 한 단계 밖을 따라가지 않음. 본문은 명령으로 실행되지 않음 |
 | 16 | `@이름` 메시지, pause/resume/stop, need_user 알림 | 없음. 질문은 피드 한 줄로만 알림 | 질문 텍스트가 알림을 대신 | 계획 | pause 후 턴이 멈추고 resume 후 같은 세션으로 이어짐 |
 | 17 | 길찾기, 이름표, 말풍선, HUD 숫자, 연단 | 직선 이동 스크립트와 이름표/말풍선 대입. 에셋과 길찾기 없음 | `OfficeNpc`, `GoalDesk` | 미검증 | 크리에이터에서 질문 때 NPC가 플레이어 쪽으로 움직이고, 답변 후 책상 좌표로 돌아옴 |
 

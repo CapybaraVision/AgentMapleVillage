@@ -9,11 +9,11 @@
 
 | 구분 | 내용 |
 | --- | --- |
-| 구현됨 | 인증된 HTTPS(로컬 테스트는 HTTP) 릴레이, 밖으로만 나가는 커넥터, 시뮬 목표 → 과제 → 질문 → 답변 → 완료, 세션 ID 고정, 재시작, 명령 재생, 마을 간 격리 |
+| 구현됨 | 인증 릴레이, 밖으로만 나가는 커넥터, 시뮬 목표 → 과제 → 질문 → 답변 → 완료, 세션 ID 고정, 재시작, 명령 재생, 마을 단위 지식 그래프(출처 기록·세션 요약·제안/승인 연결) |
 | 목업 | Claude Code `session_id` / `--resume` 배선. 테스트는 가짜 프로세스만 사용합니다. 실제 `claude` 실행은 하지 않았습니다. |
-| 미검증 | `msw/scripts`의 mLua. 메이플 크리에이터에서 붙여 넣어야 하며, 실행 가능한 `.modpackage`는 없습니다. |
+| 미검증 | `msw/scripts`의 mLua와 `config/village-anchors.json` 배치. 크리에이터에서 붙여 넣어야 하며, 실행 가능한 `.modpackage`와 완성된 월드는 없습니다. |
 | 꺼 둠 | `agent-desktop` 어댑터. 기본값이 꺼져 있고, 켜도 소켓을 열지 않습니다. |
-| 계획 | 리뷰, 디프, 머지, 워크트리, Codex, 메모리, 일시정지, 실제 Claude 턴 |
+| 계획 | 리뷰, 디프, 머지, 워크트리, Codex, 마크다운 기억, 일시정지, 실제 Claude 턴, 에셋 RUID |
 
 전체 대조는 [docs/feature-parity.md](docs/feature-parity.md)에 있습니다.
 
@@ -39,7 +39,7 @@ npm run audit
 npm run sim
 ```
 
-이 슬라이스를 맞출 때 `npm test`는 18개, `npm run typecheck`는 오류 없음, `npm run audit`는 취약점 0건이었습니다. 개발 의존성 Vitest는 5.1.0입니다.
+도서관과 화면 도우미를 넣은 뒤 `npm test`는 25개, `npm run typecheck`는 오류 없음, `npm run audit`는 취약점 0건입니다. 개발 의존성 Vitest는 5.1.0입니다.
 
 `npm run sim`은 프로세스 안에서 릴레이와 커넥터를 띄우고, 한국어 목표 하나를 끝까지 진행합니다. 유료 모델 호출은 없습니다.
 

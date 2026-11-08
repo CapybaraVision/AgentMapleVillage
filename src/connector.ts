@@ -51,6 +51,7 @@ export class Connector {
     });
     this.auth = readJson<ProfileAuth>(this.authPath());
     this.desktop = opts.desktop ?? createDesktopAdapter({ enabled: false });
+    if (this.auth?.villageId) this.office.bindVillage(this.auth.villageId);
   }
 
   get villageId(): string | undefined {
@@ -58,7 +59,10 @@ export class Connector {
   }
 
   async ensureVillage(displayName = '마을'): Promise<{ villageId: string; pairingCode?: string }> {
-    if (this.auth) return { villageId: this.auth.villageId };
+    if (this.auth) {
+      this.office.bindVillage(this.auth.villageId);
+      return { villageId: this.auth.villageId };
+    }
     if (!this.opts.rootToken) throw new Error('RELAY_ROOT_TOKEN is required to create a village');
     const created = await postJson<VillageResponse>(
       `${this.opts.relayUrl}/v1/villages`,
@@ -68,6 +72,7 @@ export class Connector {
     );
     this.auth = { villageId: created.villageId, connectorToken: created.connectorToken, lastCommandSeq: 0 };
     this.saveAuth();
+    this.office.bindVillage(created.villageId);
     return { villageId: created.villageId, pairingCode: created.pairingCode };
   }
 
