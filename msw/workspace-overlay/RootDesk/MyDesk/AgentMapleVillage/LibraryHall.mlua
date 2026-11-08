@@ -1,0 +1,148 @@
+--[[
+  UNVERIFIED MapleStory Worlds UI script.
+  Library entrance. Search, read, and one-hop neighbors display server text.
+  Choosing a kn_ id opens that entry. It does not run the text as a command.
+  No Maple/Nexon art or RUID. Creator must place the entities and confirm the layout.
+]]
+
+@Component
+script LibraryHall extends Component
+	property string RelayPath = "/maps/AgentMapleVillage/VillageRelay"
+	property string SearchInputPath = "/ui/AgentMapleLibrary/SearchInput"
+	property string NodeInputPath = "/ui/AgentMapleLibrary/NodeInput"
+	property string TitleInputPath = "/ui/AgentMapleLibrary/TitleInput"
+	property string BodyInputPath = "/ui/AgentMapleLibrary/BodyInput"
+	property string SourceInputPath = "/ui/AgentMapleLibrary/SourceInput"
+	property string TaskInputPath = "/ui/AgentMapleLibrary/TaskInput"
+	property string FromInputPath = "/ui/AgentMapleLibrary/FromInput"
+	property string ToInputPath = "/ui/AgentMapleLibrary/ToInput"
+	property string EdgeInputPath = "/ui/AgentMapleLibrary/EdgeInput"
+	property string ResultTextPath = "/ui/AgentMapleLibrary/ResultText"
+
+	@ExecSpace("ClientOnly")
+	method void OnBeginPlay()
+		self:WriteText(self.ResultTextPath, "도서관. kn_ 번호로 본문을 엽니다. 출처 기록과 세션 요약은 사실이 아닙니다.")
+	end
+
+	@ExecSpace("ClientOnly")
+	method void ShowFromServer(string text)
+		self:WriteText(self.ResultTextPath, text)
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnSearch()
+		local relay = self:Relay()
+		if relay ~= nil then
+			relay:SubmitLibrarySearch(self:ReadText(self.SearchInputPath))
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnRead()
+		local relay = self:Relay()
+		if relay ~= nil then
+			relay:SubmitLibraryRead(self:ReadText(self.NodeInputPath))
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnNeighbors()
+		local relay = self:Relay()
+		if relay ~= nil then
+			relay:SubmitLibraryNeighbors(self:ReadText(self.NodeInputPath))
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnPublishSource()
+		local relay = self:Relay()
+		if relay ~= nil then
+			relay:SubmitLibraryPublish("source", self:ReadText(self.TitleInputPath), self:ReadText(self.BodyInputPath), self:ReadText(self.SourceInputPath), self:ReadText(self.TaskInputPath))
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnPublishSummary()
+		local relay = self:Relay()
+		if relay ~= nil then
+			relay:SubmitLibraryPublish("summary", self:ReadText(self.TitleInputPath), self:ReadText(self.BodyInputPath), "", self:ReadText(self.TaskInputPath))
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnLink()
+		local relay = self:Relay()
+		if relay ~= nil then
+			relay:SubmitLibraryLink(self:ReadText(self.FromInputPath), self:ReadText(self.ToInputPath))
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnApprove()
+		local relay = self:Relay()
+		if relay ~= nil then
+			relay:SubmitLibraryApprove(self:ReadText(self.EdgeInputPath))
+		end
+	end
+
+	@EventSender("Entity", "/ui/AgentMapleLibrary/SearchButton")
+	handler HandleLibrarySearch(ButtonClickEvent event)
+		self:OnSearch()
+	end
+
+	@EventSender("Entity", "/ui/AgentMapleLibrary/ReadButton")
+	handler HandleLibraryRead(ButtonClickEvent event)
+		self:OnRead()
+	end
+
+	@EventSender("Entity", "/ui/AgentMapleLibrary/NeighborButton")
+	handler HandleLibraryNeighbors(ButtonClickEvent event)
+		self:OnNeighbors()
+	end
+
+	@EventSender("Entity", "/ui/AgentMapleLibrary/PublishSourceButton")
+	handler HandlePublishSource(ButtonClickEvent event)
+		self:OnPublishSource()
+	end
+
+	@EventSender("Entity", "/ui/AgentMapleLibrary/PublishSummaryButton")
+	handler HandlePublishSummary(ButtonClickEvent event)
+		self:OnPublishSummary()
+	end
+
+	@EventSender("Entity", "/ui/AgentMapleLibrary/LinkButton")
+	handler HandleLibraryLink(ButtonClickEvent event)
+		self:OnLink()
+	end
+
+	@EventSender("Entity", "/ui/AgentMapleLibrary/ApproveButton")
+	handler HandleLibraryApprove(ButtonClickEvent event)
+		self:OnApprove()
+	end
+
+	@ExecSpace("ClientOnly")
+	method any Relay()
+		local relay = _EntityService:GetEntityByPath(self.RelayPath)
+		if relay == nil then
+			return nil
+		end
+		return relay.VillageRelay
+	end
+
+	@ExecSpace("ClientOnly")
+	method string ReadText(string entityPath)
+		local entity = _EntityService:GetEntityByPath(entityPath)
+		if entity == nil or entity.TextInputComponent == nil then
+			return ""
+		end
+		return entity.TextInputComponent.Text or ""
+	end
+
+	@ExecSpace("ClientOnly")
+	method void WriteText(string entityPath, string text)
+		local entity = _EntityService:GetEntityByPath(entityPath)
+		if entity ~= nil and entity.TextComponent ~= nil then
+			entity.TextComponent.Text = text
+		end
+	end
+end

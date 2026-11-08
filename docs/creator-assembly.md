@@ -1,3 +1,29 @@
+# 크리에이터에 넣기
+
+공식 제작 경로로 만든 파일은 `msw/workspace-overlay`에 있습니다. `MapBuilder.fromTemplate(sideview)`와 `UIBuilder`가 썼습니다. 스킬 저장소 `MSW-Git/msw-ai-coding-plugins-official` 커밋 `96133b2991d71b66bbe1e2494d28e4cc4bf57f82`입니다. RUID는 그 스킬 안에 이미 있던 값만 복사했습니다. 새로 만든 RUID는 없습니다. 크리에이터에서 열어 보지는 않았습니다.
+
+## 백업 후 복사
+
+메이커가 플레이 중이 아닐 때, 월드의 LocalWorkspace 폴더에서:
+
+```powershell
+node tools/deploy-msw-overlay.mjs C:\path\to\the\exported\LocalWorkspace
+```
+
+스크립트는 덮어쓸 파일을 월드 폴더 바깥 `AgentMapleVillage-backup-<시각>`에 먼저 복사합니다. `Global/SectorConfig.config`가 없거나 `entries`가 문자열 배열이 아니면 그 파일은 고치지 않고 멈춥니다. `UseExtendedScriptFormat`이 true가 아니면 WorldConfig도 고치지 않습니다. 끝난 뒤 메이커에서 refresh가 필요합니다. 이 스크립트는 refresh와 play를 하지 않습니다.
+
+시드가 꼭 필요합니다.
+
+- 내보낸 LocalWorkspace 루트. `Global`, `map`, `ui`, `RootDesk`가 있어야 합니다.
+- `Global/WorldConfig.config`에 `"UseExtendedScriptFormat": true`.
+- `Global/SectorConfig.config`의 `entries`가 문자열 배열이면 `map://AgentMapleVillage`를 덧붙입니다. 모양이 다르면 파일을 보내 줘야 안전하게 넣을 수 있습니다.
+
+## 들어 있는 것
+
+- `map/AgentMapleVillage.map`: 공식 사이드뷰 템플릿. TileMapMode 2. 책상 6. 세션 NPC는 `ses_foreman`(S01)과 `ses_worker`(S02)만. 나머지 책상은 빈 자리입니다.
+- `ui/AgentMapleDesk.ui`, `ui/AgentMapleLibrary.ui`: 지휘석과 도서관. 지식 그래프 그림이 아니라 검색, 본문, 이웃 목록입니다.
+- `RootDesk/MyDesk/AgentMapleVillage/*.mlua`: 확장 스크립트 형식의 원본.
+
 # 크리에이터 수동 조립
 
 공식 문서(Utilization of Packages, postId 647)에서 패키지는 크리에이터의 Workspace에서 Export To Package로 저장하고, Import Package로 다시 넣습니다. 리소스를 넣으려면 월드가 서버에 저장된 RUID가 필요합니다. 네이티브 항목은 그대로 패키지에 넣지 못합니다. `.mod` 전체 월드 파일의 바이트 형식은 그 문서에 없습니다.

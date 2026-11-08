@@ -6,12 +6,12 @@
 
 @Component
 script GoalDesk extends Component
-	property string RelayPath = "/workspace/VillageRelay"
-	property string GoalInputPath = "/ui/DefaultGroup/GoalInput"
-	property string PairInputPath = "/ui/DefaultGroup/PairInput"
-	property string StatusTextPath = "/ui/DefaultGroup/StatusText"
-	property string QuestionTextPath = "/ui/DefaultGroup/QuestionText"
-	property string ResultTextPath = "/ui/DefaultGroup/ResultText"
+	property string RelayPath = "/maps/AgentMapleVillage/VillageRelay"
+	property string GoalInputPath = "/ui/AgentMapleDesk/GoalInput"
+	property string PairInputPath = "/ui/AgentMapleDesk/PairInput"
+	property string StatusTextPath = "/ui/AgentMapleDesk/StatusText"
+	property string QuestionTextPath = "/ui/AgentMapleDesk/QuestionText"
+	property string ResultTextPath = "/ui/AgentMapleDesk/ResultText"
 
 	@ExecSpace("ClientOnly")
 	method void OnBeginPlay()
@@ -67,22 +67,22 @@ script GoalDesk extends Component
 		end
 	end
 
-	@EventSender("Entity", "/ui/DefaultGroup/PairButton")
+	@EventSender("Entity", "/ui/AgentMapleDesk/PairButton")
 	handler HandlePairButton(ButtonClickEvent event)
 		self:OnPairSubmit()
 	end
 
-	@EventSender("Entity", "/ui/DefaultGroup/GoalButton")
+	@EventSender("Entity", "/ui/AgentMapleDesk/GoalButton")
 	handler HandleGoalButton(ButtonClickEvent event)
 		self:OnGoalSubmit()
 	end
 
-	@EventSender("Entity", "/ui/DefaultGroup/AcceptButton")
+	@EventSender("Entity", "/ui/AgentMapleDesk/AcceptButton")
 	handler HandleAcceptButton(ButtonClickEvent event)
 		self:OnAccept()
 	end
 
-	@EventSender("Entity", "/ui/DefaultGroup/DenyButton")
+	@EventSender("Entity", "/ui/AgentMapleDesk/DenyButton")
 	handler HandleDenyButton(ButtonClickEvent event)
 		self:OnDeny()
 	end

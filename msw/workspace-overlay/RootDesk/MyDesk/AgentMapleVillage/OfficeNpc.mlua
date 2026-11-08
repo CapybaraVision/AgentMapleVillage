@@ -1,0 +1,77 @@
+--[[
+  UNVERIFIED MapleStory Worlds script source.
+  Put this on each office NPC (foreman and worker) and name the script OfficeNpc.
+  The relay sets Station and ActivityText. This script only moves the NPC.
+  There is no navmesh here: it steps in a straight line. Creator must verify movement.
+  No Maple/Nexon assets are referenced.
+]]
+
+@Component
+script OfficeNpc extends Component
+	property string SessionId = "ses_worker"
+	property string Station = "desk"
+	property string ActivityText = "대기 중"
+	property string OwnerUserId = ""
+	property boolean CaptureOwnerOnNextEnter = false
+	property number DeskX = 0
+	property number DeskY = 0
+	property boolean DeskSaved = false
+	property string SlotLabel = ""
+	property number LibraryX = 0
+	property number MoveSpeed = 2.5
+
+	@ExecSpace("ServerOnly")
+	method void OnBeginPlay()
+		if self.DeskSaved == false then
+			local pos = self.Entity.TransformComponent.WorldPosition
+			self.DeskX = pos.x
+			self.DeskY = pos.y
+			self.DeskSaved = true
+		end
+		local tick = function()
+			self:Step(0.1)
+		end
+		_TimerService:SetTimerRepeat(tick, 0.1)
+	end
+
+	@ExecSpace("ServerOnly")
+	@EventSender("Service", "UserService")
+	handler HandleUserEnterEvent(UserEnterEvent event)
+		-- UserService has no world-owner field. ProfileCode is not a relay credential.
+		-- The first player is not the owner unless the creator arms this switch.
+		if self.CaptureOwnerOnNextEnter == true and self.OwnerUserId == "" then
+			self.OwnerUserId = event.UserId
+			self.CaptureOwnerOnNextEnter = false
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void Step(number delta)
+		-- One horizontal floor. Y stays on the desk line captured at start.
+		-- conceptY bands in the anchor manifest are not a path.
+		local targetX = self.DeskX
+		local targetY = self.DeskY
+		if self.Station == "user" and self.OwnerUserId ~= "" then
+			local userEntity = _UserService:GetUserEntityByUserId(self.OwnerUserId)
+			if userEntity ~= nil and userEntity.TransformComponent ~= nil then
+				targetX = userEntity.TransformComponent.WorldPosition.x
+			end
+		elseif self.Station == "library" then
+			targetX = self.LibraryX
+		end
+		local pos = self.Entity.TransformComponent.WorldPosition
+		local dx = targetX - pos.x
+		local dy = targetY - pos.y
+		local distance = (dx * dx + dy * dy) ^ 0.5
+		if distance < 0.15 then
+			self.Entity.MovementComponent:Stop()
+			return
+		end
+		local step = self.MoveSpeed * delta
+		if step > distance then
+			step = distance
+		end
+		-- SetWorldPosition is documented. This does not claim a walking animation or pathfinding.
+		self.Entity.MovementComponent:SetWorldPosition(Vector2(pos.x + (dx / distance) * step, pos.y + (dy / distance) * step))
+	end
+end

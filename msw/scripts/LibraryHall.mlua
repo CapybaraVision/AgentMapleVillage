@@ -7,17 +7,17 @@
 
 @Component
 script LibraryHall extends Component
-	property string RelayPath = "/workspace/VillageRelay"
-	property string SearchInputPath = "/ui/DefaultGroup/LibrarySearchInput"
-	property string NodeInputPath = "/ui/DefaultGroup/LibraryNodeInput"
-	property string TitleInputPath = "/ui/DefaultGroup/LibraryTitleInput"
-	property string BodyInputPath = "/ui/DefaultGroup/LibraryBodyInput"
-	property string SourceInputPath = "/ui/DefaultGroup/LibrarySourceInput"
-	property string TaskInputPath = "/ui/DefaultGroup/LibraryTaskInput"
-	property string FromInputPath = "/ui/DefaultGroup/LibraryFromInput"
-	property string ToInputPath = "/ui/DefaultGroup/LibraryToInput"
-	property string EdgeInputPath = "/ui/DefaultGroup/LibraryEdgeInput"
-	property string ResultTextPath = "/ui/DefaultGroup/LibraryResultText"
+	property string RelayPath = "/maps/AgentMapleVillage/VillageRelay"
+	property string SearchInputPath = "/ui/AgentMapleLibrary/SearchInput"
+	property string NodeInputPath = "/ui/AgentMapleLibrary/NodeInput"
+	property string TitleInputPath = "/ui/AgentMapleLibrary/TitleInput"
+	property string BodyInputPath = "/ui/AgentMapleLibrary/BodyInput"
+	property string SourceInputPath = "/ui/AgentMapleLibrary/SourceInput"
+	property string TaskInputPath = "/ui/AgentMapleLibrary/TaskInput"
+	property string FromInputPath = "/ui/AgentMapleLibrary/FromInput"
+	property string ToInputPath = "/ui/AgentMapleLibrary/ToInput"
+	property string EdgeInputPath = "/ui/AgentMapleLibrary/EdgeInput"
+	property string ResultTextPath = "/ui/AgentMapleLibrary/ResultText"
 
 	@ExecSpace("ClientOnly")
 	method void OnBeginPlay()
@@ -85,37 +85,37 @@ script LibraryHall extends Component
 		end
 	end
 
-	@EventSender("Entity", "/ui/DefaultGroup/LibrarySearchButton")
+	@EventSender("Entity", "/ui/AgentMapleLibrary/SearchButton")
 	handler HandleLibrarySearch(ButtonClickEvent event)
 		self:OnSearch()
 	end
 
-	@EventSender("Entity", "/ui/DefaultGroup/LibraryReadButton")
+	@EventSender("Entity", "/ui/AgentMapleLibrary/ReadButton")
 	handler HandleLibraryRead(ButtonClickEvent event)
 		self:OnRead()
 	end
 
-	@EventSender("Entity", "/ui/DefaultGroup/LibraryNeighborButton")
+	@EventSender("Entity", "/ui/AgentMapleLibrary/NeighborButton")
 	handler HandleLibraryNeighbors(ButtonClickEvent event)
 		self:OnNeighbors()
 	end
 
-	@EventSender("Entity", "/ui/DefaultGroup/LibraryPublishSourceButton")
+	@EventSender("Entity", "/ui/AgentMapleLibrary/PublishSourceButton")
 	handler HandlePublishSource(ButtonClickEvent event)
 		self:OnPublishSource()
 	end
 
-	@EventSender("Entity", "/ui/DefaultGroup/LibraryPublishSummaryButton")
+	@EventSender("Entity", "/ui/AgentMapleLibrary/PublishSummaryButton")
 	handler HandlePublishSummary(ButtonClickEvent event)
 		self:OnPublishSummary()
 	end
 
-	@EventSender("Entity", "/ui/DefaultGroup/LibraryLinkButton")
+	@EventSender("Entity", "/ui/AgentMapleLibrary/LinkButton")
 	handler HandleLibraryLink(ButtonClickEvent event)
 		self:OnLink()
 	end
 
-	@EventSender("Entity", "/ui/DefaultGroup/LibraryApproveButton")
+	@EventSender("Entity", "/ui/AgentMapleLibrary/ApproveButton")
 	handler HandleLibraryApprove(ButtonClickEvent event)
 		self:OnApprove()
 	end

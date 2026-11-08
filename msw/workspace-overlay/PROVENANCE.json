@@ -1,0 +1,11 @@
+{
+  "notTestedInCreator": true,
+  "skillRepo": "https://github.com/MSW-Git/msw-ai-coding-plugins-official",
+  "skillCommit": "96133b2991d71b66bbe1e2494d28e4cc4bf57f82",
+  "note": "RUID values were copied by the official builders from that skill checkout. This repository did not invent them.",
+  "ruids": {
+    "65c4167ea7484196b890022354e5a4a4": "present in MSW-Git msw-maker-base-skill at skillCommit",
+    "8ef238e0d0ca4bb783aca526cff35d11": "present in MSW-Git msw-maker-base-skill at skillCommit",
+    "2860136c06ab075439721c027de365af": "present in MSW-Git msw-maker-base-skill at skillCommit"
+  }
+}

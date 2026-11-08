@@ -39,7 +39,7 @@ npm run audit
 npm run sim
 ```
 
-Windows 경로와 Claude 2.1.318 프로브 인자를 고친 뒤 `npm test`는 31개, `npm run typecheck`는 오류 없음입니다. 의존성 감사는 lockfile이 그대로라 직전 0건입니다. 이 테스트는 가짜 Claude입니다.
+공식 빌더로 만든 맵과 UI를 넣은 뒤 `npm test`는 34개, `npm run typecheck`는 오류 없음입니다. 의존성 lockfile은 그대로입니다. 크리에이터에서 열어 보지는 않았습니다.
 
 `npm run sim`은 프로세스 안에서 릴레이와 커넥터를 띄우고, 한국어 목표 하나를 끝까지 진행합니다. 유료 모델 호출은 없습니다.
 

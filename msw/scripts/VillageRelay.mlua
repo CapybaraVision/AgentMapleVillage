@@ -11,10 +11,10 @@
 @Component
 script VillageRelay extends Component
 	property string RelayBase = "https://relay.example/v1"
-	property string GoalDeskPath = "/ui/DefaultGroup/GoalDesk"
-	property string LibraryHallPath = "/ui/DefaultGroup/LibraryHall"
-	property string ForemanNpcPath = "/maps/default/ForemanNpc"
-	property string WorkerNpcPath = "/maps/default/WorkerNpc"
+	property string GoalDeskPath = "/ui/AgentMapleDesk/GoalDesk"
+	property string LibraryHallPath = "/ui/AgentMapleLibrary/LibraryHall"
+	property string ForemanNpcPath = "/maps/AgentMapleVillage/Foreman"
+	property string WorkerNpcPath = "/maps/AgentMapleVillage/Worker"
 	property string ForemanActorId = "npc-foreman"
 	property string WorkerActorId = "npc-worker"
 	property string ForemanSessionId = "ses_foreman"
