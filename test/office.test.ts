@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -114,6 +115,20 @@ describe('office sim', () => {
     const again = Office.load({ file, backend: simBackend() });
     expect(again.approvalsFor('ses_alpha')).toHaveLength(1);
     expect(again.snapshot.library.nodes.some((node) => node.sessionId === 'ses_alpha' && node.kind === 'summary')).toBe(true);
+  });
+
+  it('reports real git paths from the session folder and refuses a command string', async () => {
+    const folder = dir();
+    const file = path.join(folder, 'state.json');
+    const office = Office.create({ backend: simBackend(), file, villageId: 'vil_alpha' });
+    const work = path.join(folder, 'sessions', DEFAULT_WORKER_SESSION);
+    spawnSync('git', ['init'], { cwd: work, encoding: 'utf8' });
+    fs.writeFileSync(path.join(work, 'notes.txt'), 'hello\n');
+    const seen = await office.apply('see-1', 'workspace.inspect', { sessionId: DEFAULT_WORKER_SESSION });
+    expect(String(seen.result.summary)).toContain('notes.txt');
+    expect(String(seen.result.summary)).toContain('테스트 결과는 이 검사에 없습니다.');
+    expect(office.snapshot.feed.some((item) => item.kind === 'change' && item.text.includes('notes.txt'))).toBe(true);
+    await expect(office.apply('see-2', 'workspace.inspect', { sessionId: DEFAULT_WORKER_SESSION, cmd: 'rm -rf /' })).rejects.toMatchObject({ code: 'denied' });
   });
 });
 

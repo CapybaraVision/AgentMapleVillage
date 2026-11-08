@@ -21,7 +21,8 @@ import { readJson, writeJsonAtomic } from './persist.js';
 import type { SessionDriver, TurnResult } from './claude-driver.js';
 import { emptyLibrary, Library, LibraryError, migrateLibrary, type KnowledgeEdge, type KnowledgeNode, type LibraryPanel, type LibraryState } from './library.js';
 import { FLOOR_Y, seatFor } from './seats.js';
-import { ensureSessionHome } from './session-home.js';
+import { ensureSessionHome, sessionHome } from './session-home.js';
+import { inspectWorkdir } from './workspace-inspect.js';
 import { LibraryDatabase, openLibraryDatabase } from './library-db.js';
 
 export interface Clock {
@@ -85,6 +86,7 @@ export interface WorkerContext {
   sessionKey: string;
   claudeSessionId?: string;
   referenceContext?: string;
+  workdir?: string;
 }
 
 export interface ContinueContext extends WorkerContext {
@@ -139,6 +141,7 @@ export function claudeBackend(driver: SessionDriver): WorkerBackend {
         sessionKey: ctx.sessionKey,
         ...(ctx.claudeSessionId ? { resumeSessionId: ctx.claudeSessionId } : {}),
         prompt: withReference(`Goal:\n${ctx.goalText}\nOwner answer: ${ctx.answer.option ?? ''} ${ctx.answer.text ?? ''}`.trim(), ctx.referenceContext),
+        ...(ctx.workdir ? { workdir: ctx.workdir } : {}),
         approve: async (request) => {
           if (!request.writes) return 'allow';
           return ctx.answer.option === '이대로 진행' ? 'allow' : 'deny';
@@ -324,6 +327,7 @@ export class Office {
     if (type === 'decision.answer') return this.answer(payload);
     if (type.startsWith('library.')) return this.libraryCommand(type, payload);
     if (type.startsWith('meeting.')) return this.meetingCommand(type, payload);
+    if (type === 'workspace.inspect') return this.inspectCommand(payload);
     throw new OfficeError('denied', `command type ${type} is not handled locally`);
   }
 
@@ -470,6 +474,28 @@ export class Office {
       ...(typeof payload.status === 'string' ? { status: payload.status } : {}),
       ...(villageId ? { villageId } : {}),
     });
+  }
+
+  private async inspectCommand(payload: Record<string, unknown>): Promise<ApplyResult> {
+    const sessionId = requiredString(payload, 'sessionId');
+    this.requireCharacter(sessionId);
+    if (typeof payload.cmd === 'string' || typeof payload.command === 'string') {
+      throw new OfficeError('denied', 'workspace.inspect does not accept a command string');
+    }
+    const now = this.clock.now();
+    const task = this.state.tasks.find((item) => item.assigneeSessionId === sessionId && (item.status === 'doing' || item.status === 'todo'));
+    const events = await this.noteInspect(sessionId, task?.id, now);
+    return { result: { sessionId, executable: false, summary: events[0]?.payload.text ?? '' }, events };
+  }
+
+  private async noteInspect(sessionId: string, taskId: string | undefined, now: number): Promise<DomainEvent[]> {
+    if (!this.file) return [this.feed(now, 'change', '세션 폴더가 없습니다. 변경 파일과 테스트 결과는 이 검사에 없습니다.', sessionId)];
+    const report = await inspectWorkdir(sessionHome(path.dirname(this.file), sessionId));
+    const events: DomainEvent[] = [this.feed(now, 'change', `${sessionId} ${report.summary}`, sessionId)];
+    if (this.state.villageId && report.repo) {
+      events.push(...this.rememberWork(sessionId, taskId ?? '', '작업 폴더 검사', report.files.length ? `변경 ${report.files.length}` : '변경 없음', now));
+    }
+    return events;
   }
 
   private meetingCommand(type: string, payload: Record<string, unknown>): ApplyResult {
@@ -672,6 +698,7 @@ export class Office {
       sessionKey,
       ...(record.claudeSessionId ? { claudeSessionId: record.claudeSessionId } : {}),
       ...(reference.text ? { referenceContext: reference.text } : {}),
+      ...(this.file ? { workdir: sessionHome(path.dirname(this.file), sessionId) } : {}),
     });
     this.rememberSession(sessionKey, started.claudeSessionId);
 
@@ -758,6 +785,7 @@ export class Office {
       sessionKey,
       ...(record.claudeSessionId ? { claudeSessionId: record.claudeSessionId } : {}),
       ...(reference.text ? { referenceContext: reference.text } : {}),
+      ...(this.file ? { workdir: sessionHome(path.dirname(this.file), decision.sessionId) } : {}),
       answer: { ...(option ? { option } : {}), ...(text ? { text } : {}) },
     });
     this.rememberSession(sessionKey, continued.claudeSessionId);
@@ -782,6 +810,7 @@ export class Office {
         this.statusEvent(now),
         ...this.rememberWork(worker.sessionId, task.id, goal.text, '거절', now),
       );
+      events.push(...(await this.noteInspect(decision.sessionId, task.id, now)));
       return { result: { decisionId, goalId: goal.id, status: goal.status, denied: true }, events: this.withSeats([decision.sessionId, DEFAULT_FOREMAN_SESSION], now, events) };
     }
 
@@ -811,6 +840,7 @@ export class Office {
       this.statusEvent(now),
       ...this.rememberWork(worker.sessionId, task.id, goal.text, `완료. 선택 ${decision.answer?.option ?? '없음'}`, now),
     );
+    events.push(...(await this.noteInspect(decision.sessionId, task.id, now)));
     return { result: { decisionId, goalId: goal.id, taskId: task.id, status: 'done' }, events: this.withSeats([decision.sessionId, DEFAULT_FOREMAN_SESSION], now, events) };
   }
 

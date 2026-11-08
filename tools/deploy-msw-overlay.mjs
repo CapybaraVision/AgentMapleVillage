@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 const MAP_ID = 'map://AgentMapleVillage';
 const OVERLAY_ROOT = '/maps/AgentMapleVillage';
-const VILLAGE_ENTITIES = ['Desk1', 'Desk2', 'Desk3', 'Desk4', 'Desk5', 'Desk6', 'Foreman', 'Worker', 'VillageRelay', 'Guide', 'NoticeBoard', 'BookWork', 'BookSource', 'HomeForeman', 'HomeWorker', 'MeetingRoom'];
+const VILLAGE_ENTITIES = ['Desk1', 'Desk2', 'Desk3', 'Desk4', 'Desk5', 'Desk6', 'Foreman', 'Worker', 'VillageRelay', 'Guide', 'NoticeBoard', 'BookWork', 'BookSource', 'HomeForeman', 'HomeWorker', 'MeetingRoom', 'ShelfLeft', 'ShelfRight'];
 const PLACEMENTS = {
   Desk1: { x: -5 },
   Desk2: { x: -3 },
@@ -31,6 +31,8 @@ const PLACEMENTS = {
   HomeForeman: { x: -6.5 },
   HomeWorker: { x: 6.5 },
   MeetingRoom: { x: 0 },
+  ShelfLeft: { x: 3.4 },
+  ShelfRight: { x: 6.2 },
 };
 const FLOOR_STRIPS = JSON.parse(fs.readFileSync(new URL('../msw/floors/official-strips.json', import.meta.url), 'utf8'));
 const SCRIPT_FILES = ['VillageRelay.mlua', 'OfficeNpc.mlua', 'GoalDesk.mlua', 'LibraryHall.mlua', 'OfficeStatus.mlua', 'BookSpot.mlua', 'NoticeBoard.mlua', 'GuidePost.mlua'];

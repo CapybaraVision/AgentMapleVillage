@@ -45,6 +45,27 @@ export function readOnlyClaudeArgs(prompt: string, resumeSessionId?: string): st
   return args;
 }
 
+/** Approved work still uses permission-mode default. It does not clear tools and does not skip prompts. */
+export function approvedWorkClaudeArgs(prompt: string, resumeSessionId?: string): string[] {
+  if (!prompt.trim()) throw new Error('prompt is empty');
+  const args = ['-p', prompt, '--output-format', 'json', '--permission-mode', 'default'];
+  if (resumeSessionId) args.push('--resume', resumeSessionId);
+  assertWorkClaudeArgs(args);
+  return args;
+}
+
+export function assertWorkClaudeArgs(args: string[]): void {
+  for (const flag of BANNED_FLAGS) {
+    if (args.includes(flag)) throw new Error(`approved work Claude args must not include ${flag}`);
+  }
+  const modeAt = args.indexOf('--permission-mode');
+  const mode = modeAt >= 0 ? args[modeAt + 1] : '';
+  if (mode !== 'default') throw new Error(`approved work Claude permission mode must be default, got ${mode || '(missing)'}`);
+  if (args.includes('--tools') && args[args.indexOf('--tools') + 1] === '') {
+    throw new Error('approved work Claude args must not clear the tool list');
+  }
+}
+
 export function assertReadOnlyClaudeArgs(args: string[]): void {
   for (const flag of BANNED_FLAGS) {
     if (args.includes(flag)) throw new Error(`read-only Claude args must not include ${flag}`);

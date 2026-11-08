@@ -10,7 +10,7 @@
  */
 
 import { spawn, type SpawnOptions } from 'node:child_process';
-import { parseClaudePrintJson, READONLY_TIMEOUT_MS, readOnlyClaudeArgs } from './claude-cli.js';
+import { approvedWorkClaudeArgs, parseClaudePrintJson, READONLY_TIMEOUT_MS, readOnlyClaudeArgs } from './claude-cli.js';
 
 interface Spawned {
   stdout: NodeJS.ReadableStream;
@@ -31,6 +31,7 @@ export interface TurnRequest {
   sessionKey: string;
   resumeSessionId?: string;
   prompt: string;
+  workdir?: string;
   approve: (request: ApprovalRequest) => Promise<Approval>;
 }
 
@@ -90,7 +91,11 @@ export class ClaudeCodeCliDriver implements SessionDriver {
     if (this.opts.enabled !== true) {
       throw new ClaudeDriverError('Claude Code driver is disabled. Set claude.enabled only after a local authenticated CLI is verified.');
     }
-    if (request.intent === 'work') {
+    const work = request.intent === 'work';
+    if (work) {
+      if (!request.workdir) {
+        return { sessionId: request.resumeSessionId ?? '', text: '', denied: true, reason: '세션 작업 폴더가 없어 Claude를 시작하지 않았습니다.' };
+      }
       const decision = await request.approve({ toolName: 'Write', summary: 'Claude Code workspace write', writes: true });
       if (decision !== 'allow') {
         return {
@@ -101,11 +106,15 @@ export class ClaudeCodeCliDriver implements SessionDriver {
         };
       }
     }
-    // Live CLI stays read-only. Approval only decides whether a process starts.
-    // Write tools are not added. There is no permission-bypass flag.
-    const args = readOnlyClaudeArgs(request.prompt, request.resumeSessionId);
+    const args = work
+      ? approvedWorkClaudeArgs(request.prompt, request.resumeSessionId)
+      : readOnlyClaudeArgs(request.prompt, request.resumeSessionId);
     const spawnImpl: SpawnLike = this.opts.spawnImpl ?? ((command, spawnArgs, options) => spawn(command, spawnArgs, { ...options, timeout: READONLY_TIMEOUT_MS }) as Spawned);
-    const child = spawnImpl(this.opts.command ?? 'claude', args, { shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawnImpl(this.opts.command ?? 'claude', args, {
+      shell: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      ...(request.workdir ? { cwd: request.workdir } : {}),
+    });
     const stdout = await readStream(child.stdout);
     const parsed = parseClaudePrintJson(stdout);
     await waitForExit(child);

@@ -78,12 +78,33 @@ describe('Claude Code CLI driver', () => {
     expect(calls[0]?.args).toContain('--tools');
     expect(calls[0]?.args[calls[0]!.args.indexOf('--tools') + 1]).toBe('');
     expect(calls[0]?.command).toBe('claude');
+    const workCalls: Array<{ args: string[]; cwd?: string }> = [];
+    const workSpawn: SpawnLike = (command, args, options) => {
+      expect(command).toBe('claude');
+      workCalls.push({ args, cwd: typeof options.cwd === 'string' ? options.cwd : undefined });
+      return new FakeChild('{"session_id":"sess_work","result":"기록"}\n') as unknown as ReturnType<SpawnLike>;
+    };
+    const worker = new ClaudeCodeCliDriver({ enabled: true, command: 'claude', spawnImpl: workSpawn });
+    const wrote = await worker.runTurn({
+      intent: 'work',
+      sessionKey: 'ses_worker:task_1',
+      prompt: 'edit the notes',
+      workdir: '/tmp/session-home',
+      approve: async () => 'allow',
+    });
+    expect(wrote.denied).toBe(false);
+    expect(workCalls[0]?.cwd).toBe('/tmp/session-home');
+    expect(workCalls[0]?.args).not.toContain('--dangerously-skip-permissions');
+    expect(workCalls[0]?.args).toContain('--permission-mode');
+    expect(workCalls[0]?.args[workCalls[0]!.args.indexOf('--permission-mode') + 1]).toBe('default');
+    expect(workCalls[0]?.args).not.toContain('--tools');
 
     const second = await driver.runTurn({
       intent: 'work',
       sessionKey: 'ses_worker:task_1',
       resumeSessionId: first.sessionId,
       prompt: '반영',
+      workdir: '/tmp/session-home',
       approve: async () => 'allow',
     });
     expect(second.sessionId).toBe('sess_from_cli');

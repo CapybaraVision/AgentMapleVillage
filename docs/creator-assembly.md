@@ -44,6 +44,10 @@ node tools/deploy-msw-overlay.mjs C:\path\to\the\exported\LocalWorkspace
 
 세션 NPC는 일이 없으면 자기 집 좌표에서만 짧게 왔다 갔다 합니다. 질문이 열리면 플레이어 쪽으로, 질문이 없고 목표가 진행 중이면 책상으로, 회의가 수락 또는 요청된 상태이고 일이 없으면 회의 자리로 갑니다. 진행 중인 목표나 열린 질문은 회의 때문에 취소하지 않습니다. 회의는 자리 이동이고 모델을 부르지 않으며 세션을 멈추지 않습니다. 릴레이 토큰이 없으면 집 위치에 있고 진행 중이라고 말하지 않습니다. 이동은 `MovementComponent:MoveToDirection`의 좌우 입력입니다. 높이는 바디가 타일이나 발판에 맡깁니다. 길찾기와 걷기 클립은 없습니다. 크리에이터에서 이 걸음을 확인하지 않았습니다.
 
+`workspace.inspect`는 그 세션 폴더에서 `git status`와 `git diff --numstat`만 실행합니다. 명령 문자열은 받지 않습니다. 게시판의 변경 줄은 그 출력입니다. 테스트 결과가 없으면 없다고 적습니다. 승인된 쓰기용 Claude 인자는 `--permission-mode default`이고 권한 우회 플래그는 없습니다. 클라우드 테스트는 프로세스를 주입합니다. 집 PC에서 실제 CLI를 켜는 프로브는 `AGENTMAPLE_RUN_CLAUDE_PROBE=1`이 있을 때만 읽기 전용으로 돕니다.
+
+서가 둘은 맵 빌더 기본 스프라이트입니다. 아바타 의상 RUID는 공식 스킬 체크아웃에서 확인하지 못했습니다. 메이커 Preset에서 아바타를 고르되, 빈 16진 id를 만들지 않습니다. UI 빌더 `avatar()`의 `material_id` 기본값은 빈 문자열이라 의상으로 치지 않습니다.
+
 지식 그래프의 기준 저장소는 프로필 옆 `library.sqlite`입니다. Node에 들어 있는 SQLite를 쓰고, 클라우드 DB나 추가 패키지는 없습니다. 예전 `state.json` 그래프는 처음 열 때 그 파일로 옮기고, 옮기기 전 내용을 `library.sqlite.json-backup`에 남깁니다. 같은 제목의 다음 작업은 새 노드가 아니라 같은 `kn_`의 수정 기록입니다. 책은 그 노드를 가리키는 세계 오브젝트이고 NPC가 아닙니다. 안내원이 질문과 안내를 맡습니다. 릴레이는 SQL을 받지 않습니다. 메이플 쪽 갱신은 기존 조회 명령을 정해진 횟수 안에서 다시 부르는 방식입니다. 연결이 끊기면 기록은 파일에 남고, 화면은 끊긴 상태를 유지합니다.
 
 지휘석 버튼은 `015e8a` 플레이에서 패널을 열었습니다. 도서관 버튼과 이동은 그 플레이에서 확인하지 않았습니다. 스크립트는 버튼 UUID로 `ConnectEvent(ButtonClickEvent)`를 걸고, 핸들러는 ClientOnly입니다. 맵 터치는 TouchReceiveComponent의 `[self]` TouchEvent입니다. 슬래시 명령은 쓰지 않습니다. 읽은 범위는 [creator-sources.md](creator-sources.md)입니다. 꾸미기 대기는 [polish-backlog.md](polish-backlog.md)입니다.

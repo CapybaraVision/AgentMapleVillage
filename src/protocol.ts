@@ -31,6 +31,7 @@ export const WORLD_COMMANDS = [
   'meeting.accept',
   'meeting.cancel',
   'meeting.end',
+  'workspace.inspect',
 ] as const;
 export type WorldCommandType = (typeof WORLD_COMMANDS)[number];
 

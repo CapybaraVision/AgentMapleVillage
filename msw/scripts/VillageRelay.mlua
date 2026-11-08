@@ -276,7 +276,7 @@ script VillageRelay extends Component
 		local index = #feed
 		while index >= 1 and count < 4 do
 			local item = feed[index]
-			if item ~= nil and (item.kind == "goal" or item.kind == "decision" or item.kind == "system" or item.kind == "task") and item.text ~= nil then
+			if item ~= nil and (item.kind == "goal" or item.kind == "decision" or item.kind == "system" or item.kind == "task" or item.kind == "change") and item.text ~= nil then
 				local who = item.sessionId or "세션 없음"
 				lines = lines .. who .. " " .. tostring(item.text) .. "\n"
 				count = count + 1
@@ -295,7 +295,7 @@ script VillageRelay extends Component
 		if item == nil or item.text == nil then
 			return
 		end
-		if item.kind ~= "goal" and item.kind ~= "decision" and item.kind ~= "system" and item.kind ~= "task" then
+		if item.kind ~= "goal" and item.kind ~= "decision" and item.kind ~= "system" and item.kind ~= "task" and item.kind ~= "change" then
 			return
 		end
 		local who = item.sessionId or "세션 없음"
@@ -457,6 +457,13 @@ script VillageRelay extends Component
 		self.CommandCounter = self.CommandCounter + 1
 		local commandId = "lib-" .. tostring(DateTime.UtcNow.Elapsed) .. "-" .. tostring(self.CommandCounter)
 		self:SendCommand(commandId, commandType, payload)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitWorkspaceInspect(string sessionId)
+		self.CommandCounter = self.CommandCounter + 1
+		local commandId = "inspect-" .. tostring(DateTime.UtcNow.Elapsed) .. "-" .. tostring(self.CommandCounter)
+		self:SendCommand(commandId, "workspace.inspect", { sessionId = sessionId })
 	end
 
 	@ExecSpace("ServerOnly")
