@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const overlay = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../msw/workspace-overlay');
@@ -186,11 +186,27 @@ describe('Basic workspace deploy', () => {
     expect(fs.readdirSync(missingMap.parent).filter((name) => name.startsWith('AgentMapleVillage-backup-'))).toHaveLength(0);
   });
 
+  it('refuses a drive-letter ESM specifier before any deploy import', () => {
+    const windowsPath = 'C:\\tools\\deploy-msw-overlay.mjs';
+    expect(new URL(windowsPath).protocol).toBe('c:');
+    const refused = spawnSync(process.execPath, ['--input-type=module', '-e', `import ${JSON.stringify(windowsPath)};`], { encoding: 'utf8' });
+    expect(refused.status).not.toBe(0);
+    expect(refused.stderr).toContain('ERR_UNSUPPORTED_ESM_URL_SCHEME');
+    expect(refused.stderr).toContain("protocol 'c:'");
+    const specifier = pathToFileURL(deploy).href;
+    expect(new URL(specifier).protocol).toBe('file:');
+    const accepted = spawnSync(process.execPath, ['--input-type=module', '-e', `import ${JSON.stringify(specifier)};`], { encoding: 'utf8' });
+    expect(accepted.status).toBe(0);
+    expect(accepted.stderr).not.toContain('ERR_UNSUPPORTED_ESM_URL_SCHEME');
+  });
+
   it('rolls back a mid-write failure and leaves no partial village files', () => {
     const { parent, workspace, mapBytes } = basicWorkspace();
     const backup = path.join(parent, 'explicit-backup');
+    const specifier = pathToFileURL(deploy).href;
+    expect(new URL(specifier).protocol).toBe('file:');
     const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
-      import { deployWorkspace } from ${JSON.stringify(deploy)};
+      import { deployWorkspace } from ${JSON.stringify(specifier)};
       const outcome = deployWorkspace(process.env.WS, { failAfter: 2, backup: process.env.BAK });
       process.exit(outcome.code);
     `], { encoding: 'utf8', env: { ...process.env, WS: workspace, BAK: backup } });

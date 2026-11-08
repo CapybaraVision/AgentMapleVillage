@@ -19,4 +19,12 @@ describe('Windows file URL paths', () => {
     const doubled = `C:${pathname.replaceAll('/', '\\')}`;
     expect(doubled.startsWith('C:\\C:\\')).toBe(true);
   });
+
+  it('treats a bare Windows path as a c: URL, which ESM will not load', () => {
+    const windowsPath = 'C:\\Users\\pop49\\AppData\\Local\\Programs\\AgentMapleVillage\\tools\\deploy-msw-overlay.mjs';
+    expect(new URL(windowsPath).protocol).toBe('c:');
+    const specifier = `file:///${windowsPath.slice(0, 1)}:${windowsPath.slice(2).replaceAll('\\', '/')}`;
+    expect(new URL(specifier).protocol).toBe('file:');
+    expect(specifier).toBe('file:///C:/Users/pop49/AppData/Local/Programs/AgentMapleVillage/tools/deploy-msw-overlay.mjs');
+  });
 });
