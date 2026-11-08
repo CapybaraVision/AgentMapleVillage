@@ -1,0 +1,7 @@
+{
+  "listenHost": "127.0.0.1",
+  "listenPort": 8787,
+  "publicUrl": "https://relay.example",
+  "stateFile": ".agentmaple/relay-state.json",
+  "notes": "Set RELAY_ROOT_TOKEN in the environment. Do not put the token in this file. Terminate TLS on port 443 in front of listenPort. The relay never runs shell, git, or desktop commands."
+}

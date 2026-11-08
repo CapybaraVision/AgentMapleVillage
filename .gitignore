@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+*.local.json
+.agentmaple/
+profile/
+profiles/
+state/
+snapshots/
+tmp/
+*.modpackage
+.DS_Store
+reports/

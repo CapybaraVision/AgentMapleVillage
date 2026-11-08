@@ -1,0 +1,247 @@
+--[[
+  UNVERIFIED MapleStory Worlds script source.
+  Paste into a server Script component named VillageRelay. This is not a .modpackage.
+  No Nexon/Maple art, RUID, or audio is included. Unofficial; not affiliated with Nexon.
+
+  HttpService notes checked against Creator Center HttpService (postId 805):
+  server-only, PostAndWait/GetAndWait, TLS, port 443. The notice says only GET/POST
+  are supported, so this script uses PostAndWait only.
+]]
+
+@Component
+script VillageRelay extends Component
+	property string RelayBase = "https://relay.example/v1"
+	property string GoalDeskPath = "/ui/DefaultGroup/GoalDesk"
+	property string ForemanNpcPath = "/maps/default/ForemanNpc"
+	property string WorkerNpcPath = "/maps/default/WorkerNpc"
+	property string ForemanActorId = "npc-foreman"
+	property string WorkerActorId = "npc-worker"
+	property string ForemanSessionId = "ses_foreman"
+	property string WorkerSessionId = "ses_worker"
+	@ExecSpace("ServerOnly")
+	method void OnBeginPlay()
+		-- Runtime fields, not properties, so a map save does not keep the world token.
+		self.WorldToken = ""
+		self.OpenDecisionId = ""
+		self.Busy = false
+		self.Cursor = 0
+		self.CommandCounter = 0
+		local tick = function()
+			self:Poll()
+		end
+		-- 2 seconds -> 30 requests/minute, under the documented 120/minute quota.
+		_TimerService:SetTimerRepeat(tick, 2)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void BindDefaultCharacters()
+		self:SendCommand("bind-npc-foreman", "character.bind", {
+			sessionId = self.ForemanSessionId,
+			mapleActorId = self.ForemanActorId,
+			displayName = "감독관",
+			role = "lead"
+		})
+		self:SendCommand("bind-npc-worker", "character.bind", {
+			sessionId = self.WorkerSessionId,
+			mapleActorId = self.WorkerActorId,
+			displayName = "작업자",
+			role = "worker"
+		})
+	end
+
+	@ExecSpace("ClientOnly")
+	method void SubmitPairingFromInput(string code)
+		self:Pair(code)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void Pair(string code)
+		if code == nil or code == "" then
+			self:PushStatus("페어링 코드를 입력하세요.")
+			return
+		end
+		local body = { pairingCode = code }
+		local response = _HttpService:PostAndWait(self.RelayBase .. "/pair", _HttpService:JSONEncode(body), HttpContentType.ApplicationJson, { ["Content-Type"] = "application/json" })
+		local decoded = _HttpService:JSONDecode(response)
+		if decoded == nil or decoded.worldToken == nil then
+			self:PushStatus("페어링에 실패했습니다.")
+			return
+		end
+		self.WorldToken = decoded.worldToken
+		self:BindDefaultCharacters()
+		self:PushStatus("마을과 연결되었습니다.")
+	end
+
+	@ExecSpace("ClientOnly")
+	method void SubmitGoalFromInput(string text)
+		self:SubmitGoal(text)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitGoal(string text)
+		if self.WorldToken == "" then
+			self:PushStatus("먼저 페어링 코드를 입력하세요.")
+			return
+		end
+		if text == nil or text == "" then
+			self:PushStatus("목표를 입력하세요.")
+			return
+		end
+		self.CommandCounter = self.CommandCounter + 1
+		local commandId = "goal-" .. tostring(DateTime.UtcNow.Elapsed) .. "-" .. tostring(self.CommandCounter)
+		self:SendCommand(commandId, "goal.submit", { text = text, targetSessionId = self.WorkerSessionId })
+		self:PushStatus("목표를 전달했습니다.")
+	end
+
+	@ExecSpace("ClientOnly")
+	method void SubmitAnswerFromButton(string option)
+		self:SubmitAnswer(option)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitAnswer(string option)
+		if self.OpenDecisionId == nil or self.OpenDecisionId == "" then
+			self:PushStatus("대기 중인 질문이 없습니다.")
+			return
+		end
+		self.CommandCounter = self.CommandCounter + 1
+		local commandId = "answer-" .. tostring(DateTime.UtcNow.Elapsed) .. "-" .. tostring(self.CommandCounter)
+		self:SendCommand(commandId, "decision.answer", { decisionId = self.OpenDecisionId, option = option })
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SendCommand(string commandId, string commandType, table payload)
+		if self.WorldToken == "" then
+			return
+		end
+		-- DateTime.UtcNow.Elapsed is documented as the milliseconds that compose DateTime.
+		-- Creator must confirm it is Unix epoch milliseconds; a wrong clock is rejected by the relay.
+		local body = {
+			commandId = commandId,
+			type = commandType,
+			issuedAt = DateTime.UtcNow.Elapsed,
+			payload = payload
+		}
+		local headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. self.WorldToken }
+		local response = _HttpService:PostAndWait(self.RelayBase .. "/commands", _HttpService:JSONEncode(body), HttpContentType.ApplicationJson, headers)
+		log("[AgentMaple] command " .. commandId .. " -> " .. tostring(response))
+	end
+
+	@ExecSpace("ServerOnly")
+	method void Poll()
+		if self.Busy or self.WorldToken == "" then
+			return
+		end
+		self.Busy = true
+		local body = { afterEventSeq = self.Cursor }
+		local headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. self.WorldToken }
+		local response = _HttpService:PostAndWait(self.RelayBase .. "/state", _HttpService:JSONEncode(body), HttpContentType.ApplicationJson, headers)
+		local decoded = _HttpService:JSONDecode(response)
+		if decoded ~= nil then
+			if decoded.mode == "snapshot" and decoded.view ~= nil then
+				self:ApplyView(decoded.view)
+			elseif decoded.events ~= nil then
+				for i = 1, #decoded.events do
+					self:ApplyEvent(decoded.events[i])
+				end
+			end
+			if decoded.cursor ~= nil then
+				self.Cursor = decoded.cursor
+			end
+		end
+		self.Busy = false
+	end
+
+	@ExecSpace("ServerOnly")
+	method void ApplyView(table view)
+		self.OpenDecisionId = ""
+		if view.decisions ~= nil then
+			for i = 1, #view.decisions do
+				local decision = view.decisions[i]
+				if decision.status == "open" then
+					self.OpenDecisionId = decision.id
+					self:PushQuestion(decision.question)
+				end
+			end
+		end
+		if view.goals ~= nil then
+			for i = 1, #view.goals do
+				local goal = view.goals[i]
+				if goal.status == "done" then
+					self:PushResult("목표가 끝났습니다.")
+				elseif goal.status == "failed" then
+					self:PushResult("목표가 거절되거나 막혔습니다.")
+				end
+			end
+		end
+		if view.characters ~= nil then
+			for i = 1, #view.characters do
+				self:ApplyCharacter(view.characters[i])
+			end
+		end
+		if view.status ~= nil and view.status.phase ~= nil then
+			self:PushStatus("상태: " .. tostring(view.status.phase))
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void ApplyEvent(table event)
+		if event.type == "character.upsert" then
+			self:ApplyCharacter(event.payload)
+		elseif event.type == "decision.upsert" and event.payload ~= nil and event.payload.status == "open" then
+			self.OpenDecisionId = event.payload.id
+			self:PushQuestion(event.payload.question)
+		elseif event.type == "goal.upsert" and event.payload ~= nil and event.payload.status == "done" then
+			self:PushResult("목표가 끝났습니다.")
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void ApplyCharacter(table character)
+		if character == nil then
+			return
+		end
+		local npcPath = self.WorkerNpcPath
+		if character.role == "lead" then
+			npcPath = self.ForemanNpcPath
+		end
+		local npc = _EntityService:GetEntityByPath(npcPath)
+		if npc == nil or npc.OfficeNpc == nil then
+			log("[AgentMaple] NPC path not found: " .. npcPath)
+			return
+		end
+		npc.OfficeNpc.SessionId = character.sessionId
+		npc.OfficeNpc.Station = character.station
+		npc.OfficeNpc.ActivityText = character.activity
+		if npc.NameTagComponent ~= nil then
+			npc.NameTagComponent.Name = character.displayName .. " · " .. character.activity
+		end
+		if npc.ChatBalloonComponent ~= nil and character.station == "user" then
+			npc.ChatBalloonComponent.Message = character.activity
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void PushStatus(string text)
+		self:PushUi("status", text)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void PushQuestion(string text)
+		self:PushUi("question", text)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void PushResult(string text)
+		self:PushUi("result", text)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void PushUi(string kind, string text)
+		local desk = _EntityService:GetEntityByPath(self.GoalDeskPath)
+		if desk == nil or desk.GoalDesk == nil then
+			return
+		end
+		desk.GoalDesk:ShowFromServer(kind, text)
+	end
+end

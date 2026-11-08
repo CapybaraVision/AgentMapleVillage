@@ -1,0 +1,25 @@
+{
+  "name": "agentmaple-village",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "Unofficial MapleStory Worlds office village for local AI sessions. Not affiliated with Nexon.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "audit": "npm audit --audit-level=moderate",
+    "sim": "tsx src/bin/sim-demo.ts",
+    "relay": "tsx src/bin/relay.ts",
+    "connector": "tsx src/bin/connector.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.0"
+  }
+}

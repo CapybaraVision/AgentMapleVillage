@@ -1,0 +1,536 @@
+import path from 'node:path';
+import {
+  ACTOR_ID_RE,
+  COMMAND_ID_RE,
+  DEFAULT_FOREMAN_ACTOR,
+  DEFAULT_FOREMAN_SESSION,
+  DEFAULT_WORKER_ACTOR,
+  DEFAULT_WORKER_SESSION,
+  SESSION_ID_RE,
+  type AgentSessionRecord,
+  type Character,
+  type Decision,
+  type DomainEvent,
+  type Goal,
+  type OfficeView,
+  type Role,
+  type Task,
+} from './protocol.js';
+import { fingerprint } from './json.js';
+import { readJson, writeJsonAtomic } from './persist.js';
+import type { SessionDriver, TurnResult } from './claude-driver.js';
+
+export interface Clock {
+  now(): number;
+}
+
+export const systemClock: Clock = { now: () => Date.now() };
+
+export class OfficeError extends Error {
+  constructor(
+    readonly code: 'bad_request' | 'conflict' | 'not_found' | 'denied',
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+export interface ApplyResult {
+  result: Record<string, unknown>;
+  events: DomainEvent[];
+}
+
+interface AppliedCommand {
+  fingerprint: string;
+  result: Record<string, unknown>;
+  events: DomainEvent[];
+}
+
+export interface OfficeState {
+  version: 1;
+  backend: 'sim' | 'claude';
+  characters: Character[];
+  goals: Goal[];
+  tasks: Task[];
+  decisions: Decision[];
+  sessions: AgentSessionRecord[];
+  feed: OfficeView['feed'];
+  applied: Record<string, AppliedCommand>;
+  counters: { goal: number; task: number; decision: number; feed: number };
+  phase: string;
+  createdAt: number;
+}
+
+export interface WorkerContext {
+  sessionId: string;
+  taskId: string;
+  goalId: string;
+  goalText: string;
+  sessionKey: string;
+  claudeSessionId?: string;
+}
+
+export interface ContinueContext extends WorkerContext {
+  answer: { option?: string; text?: string };
+}
+
+export interface WorkerBackend {
+  readonly id: 'sim' | 'claude';
+  startTask(ctx: WorkerContext): Promise<{ claudeSessionId?: string; question: string; options: string[] } | { denied: true; reason: string; claudeSessionId?: string }>;
+  continueTask(ctx: ContinueContext): Promise<{ claudeSessionId?: string; done: boolean; summary: string; denied?: boolean }>;
+}
+
+const QUESTION = '이 목표를 이 범위로 진행할까요?';
+const OPTIONS = ['이대로 진행', '거절'] as const;
+
+export function simBackend(): WorkerBackend {
+  return {
+    id: 'sim',
+    async startTask() {
+      return { question: QUESTION, options: [...OPTIONS] };
+    },
+    async continueTask(ctx) {
+      if (ctx.answer.option === '거절') {
+        return { done: false, denied: true, summary: '사용자가 이 범위를 거절했습니다.' };
+      }
+      return { done: true, summary: '시뮬 작업이 끝났습니다. 실제 모델 호출은 없습니다.' };
+    },
+  };
+}
+
+export function claudeBackend(driver: SessionDriver): WorkerBackend {
+  return {
+    id: 'claude',
+    async startTask(ctx) {
+      const turn = await driver.runTurn({
+        intent: 'ask',
+        sessionKey: ctx.sessionKey,
+        ...(ctx.claudeSessionId ? { resumeSessionId: ctx.claudeSessionId } : {}),
+        prompt: `Goal:\n${ctx.goalText}\nAsk the owner to confirm the scope before writing files.`,
+        approve: async () => 'deny',
+      });
+      if (turn.denied) return { denied: true, reason: turn.reason ?? 'denied', ...(turn.sessionId ? { claudeSessionId: turn.sessionId } : {}) };
+      return {
+        ...(turn.sessionId ? { claudeSessionId: turn.sessionId } : {}),
+        question: QUESTION,
+        options: [...OPTIONS],
+      };
+    },
+    async continueTask(ctx) {
+      const turn: TurnResult = await driver.runTurn({
+        intent: 'work',
+        sessionKey: ctx.sessionKey,
+        ...(ctx.claudeSessionId ? { resumeSessionId: ctx.claudeSessionId } : {}),
+        prompt: `Goal:\n${ctx.goalText}\nOwner answer: ${ctx.answer.option ?? ''} ${ctx.answer.text ?? ''}`.trim(),
+        approve: async (request) => {
+          if (!request.writes) return 'allow';
+          return ctx.answer.option === '이대로 진행' ? 'allow' : 'deny';
+        },
+      });
+      if (turn.denied) {
+        return {
+          done: false,
+          denied: true,
+          summary: turn.reason ?? '쓰기 권한이 거부되었습니다.',
+          ...(turn.sessionId ? { claudeSessionId: turn.sessionId } : {}),
+        };
+      }
+      return {
+        done: true,
+        summary: turn.text || '작업 결과를 반영했습니다.',
+        ...(turn.sessionId ? { claudeSessionId: turn.sessionId } : {}),
+      };
+    },
+  };
+}
+
+function defaultCharacters(): Character[] {
+  return [
+    {
+      sessionId: DEFAULT_FOREMAN_SESSION,
+      mapleActorId: DEFAULT_FOREMAN_ACTOR,
+      displayName: '감독관',
+      role: 'lead',
+      state: 'idle',
+      station: 'desk',
+      activity: '대기 중',
+    },
+    {
+      sessionId: DEFAULT_WORKER_SESSION,
+      mapleActorId: DEFAULT_WORKER_ACTOR,
+      displayName: '작업자',
+      role: 'worker',
+      state: 'idle',
+      station: 'desk',
+      activity: '대기 중',
+    },
+  ];
+}
+
+function emptyState(backend: 'sim' | 'claude', now: number): OfficeState {
+  return {
+    version: 1,
+    backend,
+    characters: defaultCharacters(),
+    goals: [],
+    tasks: [],
+    decisions: [],
+    sessions: [],
+    feed: [],
+    applied: {},
+    counters: { goal: 0, task: 0, decision: 0, feed: 0 },
+    phase: 'idle',
+    createdAt: now,
+  };
+}
+
+export class Office {
+  private constructor(
+    private state: OfficeState,
+    private backend: WorkerBackend,
+    private clock: Clock,
+    private file?: string,
+  ) {}
+
+  static create(opts: { backend: WorkerBackend; clock?: Clock; file?: string }): Office {
+    const clock = opts.clock ?? systemClock;
+    const office = new Office(emptyState(opts.backend.id, clock.now()), opts.backend, clock, opts.file);
+    office.save();
+    return office;
+  }
+
+  static load(opts: { file: string; backend: WorkerBackend; clock?: Clock }): Office {
+    const clock = opts.clock ?? systemClock;
+    const saved = readJson<OfficeState>(opts.file);
+    if (!saved) return Office.create({ backend: opts.backend, clock, file: opts.file });
+    if (saved.version !== 1) throw new OfficeError('bad_request', 'unsupported office state version');
+    saved.backend = opts.backend.id;
+    return new Office(saved, opts.backend, clock, opts.file);
+  }
+
+  get snapshot(): OfficeState {
+    return structuredClone(this.state);
+  }
+
+  save(): void {
+    if (!this.file) return;
+    writeJsonAtomic(this.file, this.state);
+  }
+
+  static statePath(profileDir: string): string {
+    return path.join(profileDir, 'state.json');
+  }
+
+  async apply(commandId: string, type: string, payload: Record<string, unknown>): Promise<ApplyResult> {
+    if (!COMMAND_ID_RE.test(commandId)) throw new OfficeError('bad_request', 'invalid commandId');
+    const prior = this.state.applied[commandId];
+    const body = fingerprint({ type, payload });
+    if (prior) {
+      if (prior.fingerprint !== body) throw new OfficeError('conflict', 'commandId was already used with a different body');
+      return { result: { ...prior.result, duplicate: true }, events: prior.events.map((event) => ({ ...event, payload: { ...event.payload } })) };
+    }
+    const produced = await this.dispatch(type, payload);
+    produced.events.forEach((event, index) => {
+      event.eventId = `${commandId}:${index}`;
+    });
+    this.state.applied[commandId] = { fingerprint: body, result: produced.result, events: produced.events };
+    this.save();
+    return produced;
+  }
+
+  private async dispatch(type: string, payload: Record<string, unknown>): Promise<ApplyResult> {
+    if (type === 'character.bind') return this.bindCharacter(payload);
+    if (type === 'goal.submit') return this.submitGoal(payload);
+    if (type === 'decision.answer') return this.answer(payload);
+    throw new OfficeError('denied', `command type ${type} is not handled locally`);
+  }
+
+  private bindCharacter(payload: Record<string, unknown>): ApplyResult {
+    const sessionId = requiredString(payload, 'sessionId');
+    const mapleActorId = requiredString(payload, 'mapleActorId');
+    const displayName = requiredString(payload, 'displayName');
+    const role = requiredString(payload, 'role');
+    if (!SESSION_ID_RE.test(sessionId)) throw new OfficeError('bad_request', 'invalid sessionId');
+    if (!ACTOR_ID_RE.test(mapleActorId)) throw new OfficeError('bad_request', 'invalid mapleActorId');
+    if (role !== 'lead' && role !== 'worker') throw new OfficeError('bad_request', 'invalid role');
+    if (displayName.length > 40) throw new OfficeError('bad_request', 'displayName is too long');
+
+    const byActor = this.state.characters.find((item) => item.mapleActorId === mapleActorId);
+    const bySession = this.state.characters.find((item) => item.sessionId === sessionId);
+    if (byActor && byActor.sessionId !== sessionId) {
+      throw new OfficeError('conflict', `actor ${mapleActorId} is already bound to ${byActor.sessionId}`);
+    }
+    if (bySession && bySession.mapleActorId !== mapleActorId) {
+      throw new OfficeError('conflict', `session ${sessionId} is already bound to ${bySession.mapleActorId}`);
+    }
+    const now = this.clock.now();
+    let character: Character;
+    if (bySession) {
+      bySession.displayName = displayName;
+      bySession.role = role as Role;
+      character = bySession;
+    } else {
+      character = {
+        sessionId,
+        mapleActorId,
+        displayName,
+        role: role as Role,
+        state: 'idle',
+        station: 'desk',
+        activity: '대기 중',
+      };
+      this.state.characters.push(character);
+    }
+    const events = [this.characterEvent(character, now), this.feed(now, 'system', `${displayName} 세션이 고정되었습니다.`, sessionId)];
+    return { result: { sessionId, mapleActorId }, events };
+  }
+
+  private async submitGoal(payload: Record<string, unknown>): Promise<ApplyResult> {
+    const text = requiredString(payload, 'text').trim();
+    if (text.length < 1 || text.length > 500) throw new OfficeError('bad_request', 'goal text must be 1-500 characters');
+    const sessionId = typeof payload.targetSessionId === 'string' ? payload.targetSessionId : DEFAULT_WORKER_SESSION;
+    if (!SESSION_ID_RE.test(sessionId)) throw new OfficeError('bad_request', 'invalid targetSessionId');
+    const worker = this.requireCharacter(sessionId);
+    if (worker.role !== 'worker') throw new OfficeError('bad_request', 'goals are assigned to a worker session');
+    if (this.state.goals.some((goal) => goal.sessionId === sessionId && (goal.status === 'planning' || goal.status === 'active'))) {
+      throw new OfficeError('conflict', 'this session already has an open goal');
+    }
+    const open = this.state.decisions.find((item) => item.sessionId === sessionId && item.status === 'open');
+    if (open) throw new OfficeError('conflict', 'this session already has an open question');
+
+    const now = this.clock.now();
+    const goalId = `goal_${++this.state.counters.goal}`;
+    const taskId = `task_${++this.state.counters.task}`;
+    const decisionId = `dec_${++this.state.counters.decision}`;
+    const goal: Goal = { id: goalId, text, status: 'planning', sessionId, createdAt: now, updatedAt: now };
+    const task: Task = {
+      id: taskId,
+      goalId,
+      title: text.length > 40 ? `${text.slice(0, 40)}…` : text,
+      status: 'doing',
+      assigneeSessionId: sessionId,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.state.goals.push(goal);
+    this.state.tasks.push(task);
+    const lead = this.requireCharacter(DEFAULT_FOREMAN_SESSION);
+    lead.state = 'thinking';
+    lead.station = 'desk';
+    lead.activity = '목표를 나누는 중';
+    worker.state = 'editing';
+    worker.station = 'desk';
+    worker.activity = '책상에서 작업 중';
+    worker.taskId = taskId;
+    this.state.phase = 'working';
+
+    const sessionKey = `${sessionId}:${taskId}`;
+    const record = this.sessionRecord(sessionKey);
+    const started = await this.backend.startTask({
+      sessionId,
+      taskId,
+      goalId,
+      goalText: text,
+      sessionKey,
+      ...(record.claudeSessionId ? { claudeSessionId: record.claudeSessionId } : {}),
+    });
+    this.rememberSession(sessionKey, started.claudeSessionId);
+
+    const events: DomainEvent[] = [
+      this.characterEvent(lead, now),
+      this.goalEvent(goal, now),
+      this.taskEvent(task, now),
+      this.characterEvent(worker, now),
+    ];
+
+    if ('denied' in started) {
+      task.status = 'blocked';
+      task.summary = started.reason;
+      task.updatedAt = now;
+      goal.status = 'failed';
+      goal.updatedAt = now;
+      worker.state = 'blocked';
+      worker.station = 'desk';
+      worker.activity = '시작이 거부되었습니다';
+      this.state.phase = 'blocked';
+      events.push(this.taskEvent(task, now), this.goalEvent(goal, now), this.characterEvent(worker, now), this.feed(now, 'error', started.reason, sessionId), this.statusEvent(now));
+      return { result: { goalId, taskId, denied: true }, events };
+    }
+
+    goal.status = 'active';
+    goal.updatedAt = now;
+    const decision: Decision = {
+      id: decisionId,
+      sessionId,
+      taskId,
+      goalId,
+      kind: 'question',
+      question: `${started.question}\n${text}`,
+      options: started.options,
+      status: 'open',
+      createdAt: now,
+    };
+    this.state.decisions.push(decision);
+    worker.state = 'waiting_user';
+    worker.station = 'user';
+    worker.activity = '확인이 필요해 찾아가는 중';
+    lead.state = 'idle';
+    lead.activity = '답변을 기다리는 중';
+    this.state.phase = 'waiting_user';
+    events.push(
+      this.goalEvent(goal, now),
+      this.decisionEvent(decision, now),
+      this.characterEvent(worker, now),
+      this.characterEvent(lead, now),
+      this.feed(now, 'decision', `${worker.displayName}이 질문을 들고 왔습니다.`, sessionId),
+      this.statusEvent(now),
+    );
+    return { result: { goalId, taskId, decisionId }, events };
+  }
+
+  private async answer(payload: Record<string, unknown>): Promise<ApplyResult> {
+    const decisionId = requiredString(payload, 'decisionId');
+    const option = typeof payload.option === 'string' ? payload.option : undefined;
+    const text = typeof payload.text === 'string' ? payload.text : undefined;
+    if (!option && !text) throw new OfficeError('bad_request', 'an option or text is required');
+    if (text && text.length > 500) throw new OfficeError('bad_request', 'answer text is too long');
+    const decision = this.state.decisions.find((item) => item.id === decisionId);
+    if (!decision) throw new OfficeError('not_found', 'unknown decision');
+    if (decision.status !== 'open') throw new OfficeError('conflict', 'decision is not open');
+    if (option && !decision.options.includes(option)) throw new OfficeError('bad_request', 'option is not one of the offered choices');
+
+    const now = this.clock.now();
+    decision.status = 'answered';
+    decision.answer = { ...(option ? { option } : {}), ...(text ? { text } : {}), ts: now };
+    const task = this.state.tasks.find((item) => item.id === decision.taskId);
+    const goal = this.state.goals.find((item) => item.id === decision.goalId);
+    const worker = this.requireCharacter(decision.sessionId);
+    if (!task || !goal) throw new OfficeError('not_found', 'decision is missing its task');
+
+    const sessionKey = `${decision.sessionId}:${decision.taskId}`;
+    const record = this.sessionRecord(sessionKey);
+    const continued = await this.backend.continueTask({
+      sessionId: decision.sessionId,
+      taskId: decision.taskId,
+      goalId: decision.goalId,
+      goalText: goal.text,
+      sessionKey,
+      ...(record.claudeSessionId ? { claudeSessionId: record.claudeSessionId } : {}),
+      answer: { ...(option ? { option } : {}), ...(text ? { text } : {}) },
+    });
+    this.rememberSession(sessionKey, continued.claudeSessionId);
+
+    const events: DomainEvent[] = [this.decisionEvent(decision, now)];
+    if (continued.denied || !continued.done) {
+      task.status = 'blocked';
+      task.summary = continued.summary;
+      task.updatedAt = now;
+      goal.status = 'failed';
+      goal.updatedAt = now;
+      worker.state = 'blocked';
+      worker.station = 'desk';
+      worker.activity = '거절되어 멈춤';
+      this.state.phase = 'blocked';
+      events.push(
+        this.taskEvent(task, now),
+        this.goalEvent(goal, now),
+        this.characterEvent(worker, now),
+        this.feed(now, 'error', continued.summary, worker.sessionId),
+        this.statusEvent(now),
+      );
+      return { result: { decisionId, goalId: goal.id, status: goal.status, denied: true }, events };
+    }
+
+    task.status = 'done';
+    task.summary = continued.summary;
+    task.updatedAt = now;
+    goal.status = 'done';
+    goal.updatedAt = now;
+    worker.state = 'done';
+    worker.station = 'desk';
+    worker.activity = '완료';
+    delete worker.taskId;
+    const lead = this.state.characters.find((item) => item.role === 'lead');
+    if (lead) {
+      lead.state = 'idle';
+      lead.station = 'desk';
+      lead.activity = '대기 중';
+    }
+    this.state.phase = 'done';
+    events.push(
+      this.taskEvent(task, now),
+      this.goalEvent(goal, now),
+      this.characterEvent(worker, now),
+      ...(lead ? [this.characterEvent(lead, now)] : []),
+      this.feed(now, 'goal', '목표가 끝났습니다.', worker.sessionId),
+      this.statusEvent(now),
+    );
+    return { result: { decisionId, goalId: goal.id, taskId: task.id, status: 'done' }, events };
+  }
+
+  private sessionRecord(sessionKey: string): AgentSessionRecord {
+    const found = this.state.sessions.find((item) => item.sessionKey === sessionKey);
+    if (found) return found;
+    const created: AgentSessionRecord = {
+      sessionKey,
+      engine: this.backend.id === 'claude' ? 'claude-code' : 'sim',
+      turns: 0,
+      updatedAt: this.clock.now(),
+    };
+    this.state.sessions.push(created);
+    return created;
+  }
+
+  private rememberSession(sessionKey: string, claudeSessionId: string | undefined): void {
+    if (!claudeSessionId) return;
+    const record = this.sessionRecord(sessionKey);
+    record.claudeSessionId = claudeSessionId;
+    record.engine = 'claude-code';
+    record.turns += 1;
+    record.updatedAt = this.clock.now();
+  }
+
+  private requireCharacter(sessionId: string): Character {
+    const found = this.state.characters.find((item) => item.sessionId === sessionId);
+    if (!found) throw new OfficeError('not_found', `unknown session ${sessionId}`);
+    return found;
+  }
+
+  private characterEvent(character: Character, ts: number): DomainEvent {
+    return { eventId: '', type: 'character.upsert', sessionId: character.sessionId, ts, payload: { ...character } };
+  }
+
+  private goalEvent(goal: Goal, ts: number): DomainEvent {
+    return { eventId: '', type: 'goal.upsert', sessionId: goal.sessionId, ts, payload: { ...goal } };
+  }
+
+  private taskEvent(task: Task, ts: number): DomainEvent {
+    return { eventId: '', type: 'task.upsert', sessionId: task.assigneeSessionId, ts, payload: { ...task } };
+  }
+
+  private decisionEvent(decision: Decision, ts: number): DomainEvent {
+    return { eventId: '', type: 'decision.upsert', sessionId: decision.sessionId, ts, payload: { ...decision } };
+  }
+
+  private feed(ts: number, kind: string, text: string, sessionId?: string): DomainEvent {
+    const item = { ts, kind, text, ...(sessionId ? { sessionId } : {}) };
+    this.state.feed.push(item);
+    if (this.state.feed.length > 50) this.state.feed.splice(0, this.state.feed.length - 50);
+    return { eventId: '', type: 'feed.add', ...(sessionId ? { sessionId } : {}), ts, payload: item };
+  }
+
+  private statusEvent(ts: number): DomainEvent {
+    return {
+      eventId: '',
+      type: 'office.status',
+      ts,
+      payload: { phase: this.state.phase, backend: this.state.backend },
+    };
+  }
+}
+
+function requiredString(payload: Record<string, unknown>, key: string): string {
+  const value = payload[key];
+  if (typeof value !== 'string' || value.length === 0) throw new OfficeError('bad_request', `${key} is required`);
+  return value;
+}

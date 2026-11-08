@@ -1,0 +1,106 @@
+--[[
+  UNVERIFIED MapleStory Worlds UI script.
+  UI entities exist on the client. Wire the path properties in Creator.
+  Korean strings are the player-facing copy. Do not ship Nexon UI art with this file.
+]]
+
+@Component
+script GoalDesk extends Component
+	property string RelayPath = "/workspace/VillageRelay"
+	property string GoalInputPath = "/ui/DefaultGroup/GoalInput"
+	property string PairInputPath = "/ui/DefaultGroup/PairInput"
+	property string StatusTextPath = "/ui/DefaultGroup/StatusText"
+	property string QuestionTextPath = "/ui/DefaultGroup/QuestionText"
+	property string ResultTextPath = "/ui/DefaultGroup/ResultText"
+
+	@ExecSpace("ClientOnly")
+	method void OnBeginPlay()
+		self:WriteText(self.StatusTextPath, "마을 연결 전")
+		self:WriteText(self.QuestionTextPath, "질문이 오면 여기에 표시됩니다.")
+		self:WriteText(self.ResultTextPath, "")
+	end
+
+	@ExecSpace("ClientOnly")
+	method void ShowFromServer(string kind, string text)
+		if kind == "status" then
+			self:WriteText(self.StatusTextPath, text)
+		elseif kind == "question" then
+			self:WriteText(self.QuestionTextPath, text)
+		elseif kind == "result" then
+			self:WriteText(self.ResultTextPath, text)
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnPairSubmit()
+		local code = self:ReadText(self.PairInputPath)
+		local relay = _EntityService:GetEntityByPath(self.RelayPath)
+		if relay ~= nil and relay.VillageRelay ~= nil then
+			relay.VillageRelay:SubmitPairingFromInput(code)
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnGoalSubmit()
+		local text = self:ReadText(self.GoalInputPath)
+		local relay = _EntityService:GetEntityByPath(self.RelayPath)
+		if relay ~= nil and relay.VillageRelay ~= nil then
+			relay.VillageRelay:SubmitGoalFromInput(text)
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnAccept()
+		self:Answer("이대로 진행")
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnDeny()
+		self:Answer("거절")
+	end
+
+	@ExecSpace("ClientOnly")
+	method void Answer(string option)
+		local relay = _EntityService:GetEntityByPath(self.RelayPath)
+		if relay ~= nil and relay.VillageRelay ~= nil then
+			relay.VillageRelay:SubmitAnswerFromButton(option)
+		end
+	end
+
+	@EventSender("Entity", "/ui/DefaultGroup/PairButton")
+	handler HandlePairButton(ButtonClickEvent event)
+		self:OnPairSubmit()
+	end
+
+	@EventSender("Entity", "/ui/DefaultGroup/GoalButton")
+	handler HandleGoalButton(ButtonClickEvent event)
+		self:OnGoalSubmit()
+	end
+
+	@EventSender("Entity", "/ui/DefaultGroup/AcceptButton")
+	handler HandleAcceptButton(ButtonClickEvent event)
+		self:OnAccept()
+	end
+
+	@EventSender("Entity", "/ui/DefaultGroup/DenyButton")
+	handler HandleDenyButton(ButtonClickEvent event)
+		self:OnDeny()
+	end
+
+	@ExecSpace("ClientOnly")
+	method string ReadText(string entityPath)
+		local entity = _EntityService:GetEntityByPath(entityPath)
+		if entity == nil or entity.TextInputComponent == nil then
+			return ""
+		end
+		return entity.TextInputComponent.Text or ""
+	end
+
+	@ExecSpace("ClientOnly")
+	method void WriteText(string entityPath, string text)
+		local entity = _EntityService:GetEntityByPath(entityPath)
+		if entity ~= nil and entity.TextComponent ~= nil then
+			entity.TextComponent.Text = text
+		end
+	end
+end
