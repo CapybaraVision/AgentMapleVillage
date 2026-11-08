@@ -23,6 +23,7 @@ script VillageRelay extends Component
 	method void OnBeginPlay()
 		-- Runtime fields, not properties, so a map save does not keep the world token.
 		self.WorldToken = ""
+		self.ClockOffset = nil
 		self.OpenDecisionId = ""
 		self.Busy = false
 		self.Cursor = 0
@@ -69,6 +70,13 @@ script VillageRelay extends Component
 			return
 		end
 		self.WorldToken = decoded.worldToken
+		-- Elapsed is documented as milliseconds, not as Unix epoch.
+		-- serverTime is the relay's Unix millisecond clock. The difference is the offset.
+		if decoded.serverTime ~= nil then
+			self.ClockOffset = decoded.serverTime - DateTime.UtcNow.Elapsed
+		else
+			self.ClockOffset = nil
+		end
 		self:BindDefaultCharacters()
 		self:PushStatus("마을과 연결되었습니다.")
 	end
@@ -112,15 +120,14 @@ script VillageRelay extends Component
 
 	@ExecSpace("ServerOnly")
 	method void SendCommand(string commandId, string commandType, table payload)
-		if self.WorldToken == "" then
+		if self.WorldToken == "" or self.ClockOffset == nil then
+			self:PushStatus("릴레이 시각으로 시계를 맞추지 못했습니다.")
 			return
 		end
-		-- DateTime.UtcNow.Elapsed is documented as the milliseconds that compose DateTime.
-		-- Creator must confirm it is Unix epoch milliseconds; a wrong clock is rejected by the relay.
 		local body = {
 			commandId = commandId,
 			type = commandType,
-			issuedAt = DateTime.UtcNow.Elapsed,
+			issuedAt = DateTime.UtcNow.Elapsed + self.ClockOffset,
 			payload = payload
 		}
 		local headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. self.WorldToken }

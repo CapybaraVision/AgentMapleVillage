@@ -32,6 +32,11 @@ describe('msw script contract', () => {
     expect(hall).toContain('SubmitLibrarySearch');
     expect(hall).toContain('kn_');
     expect(relay).toContain('library.neighbors');
+    expect(relay).toContain('self.ClockOffset');
+    expect(relay).toContain('DateTime.UtcNow.Elapsed + self.ClockOffset');
+    expect(relay).not.toContain('issuedAt = DateTime.UtcNow.Elapsed,');
+    expect(npc).toContain('CaptureOwnerOnNextEnter');
+    expect(npc).not.toContain('if self.OwnerUserId == "" then\n\t\t\tself.OwnerUserId = event.UserId');
     expect(hall).not.toContain('documentVersion');
     expect(desk).toContain('질문이 오면 여기에 표시됩니다.');
     const code = all.replace(/--\[\[[\s\S]*?\]\]/g, '').replace(/--.*$/gm, '');

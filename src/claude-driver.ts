@@ -10,6 +10,7 @@
  */
 
 import { spawn, type SpawnOptions } from 'node:child_process';
+import { parseClaudePrintJson, READONLY_TIMEOUT_MS, readOnlyClaudeArgs } from './claude-cli.js';
 
 interface Spawned {
   stdout: NodeJS.ReadableStream;
@@ -100,44 +101,17 @@ export class ClaudeCodeCliDriver implements SessionDriver {
         };
       }
     }
-    const args = ['-p', request.prompt, '--output-format', 'stream-json', '--permission-mode', 'default'];
-    if (request.resumeSessionId) args.push('--resume', request.resumeSessionId);
-    const spawnImpl: SpawnLike = this.opts.spawnImpl ?? ((command, args, options) => spawn(command, args, options) as Spawned);
+    // Live CLI stays read-only. Approval only decides whether a process starts.
+    // Write tools are not added. There is no permission-bypass flag.
+    const args = readOnlyClaudeArgs(request.prompt, request.resumeSessionId);
+    const spawnImpl: SpawnLike = this.opts.spawnImpl ?? ((command, spawnArgs, options) => spawn(command, spawnArgs, { ...options, timeout: READONLY_TIMEOUT_MS }) as Spawned);
     const child = spawnImpl(this.opts.command ?? 'claude', args, { shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
     const stdout = await readStream(child.stdout);
-    const sessionId = sessionIdFromStream(stdout);
-    if (!sessionId) throw new ClaudeDriverError('Claude Code stream did not include session_id');
-    const text = resultTextFromStream(stdout);
+    const parsed = parseClaudePrintJson(stdout);
     await waitForExit(child);
-    return { sessionId, text, denied: false };
+    if (parsed.isError) throw new ClaudeDriverError('Claude print JSON reported is_error');
+    return { sessionId: parsed.sessionId, text: parsed.text, denied: false };
   }
-}
-
-function sessionIdFromStream(stdout: string): string | undefined {
-  for (const line of stdout.split('\n')) {
-    if (!line.trim()) continue;
-    try {
-      const parsed = JSON.parse(line) as { session_id?: unknown };
-      if (typeof parsed.session_id === 'string' && parsed.session_id.length > 0) return parsed.session_id;
-    } catch {
-      /* ignore non-json stderr noise that leaked to stdout */
-    }
-  }
-  return undefined;
-}
-
-function resultTextFromStream(stdout: string): string {
-  let text = '';
-  for (const line of stdout.split('\n')) {
-    if (!line.trim()) continue;
-    try {
-      const parsed = JSON.parse(line) as { type?: string; result?: unknown };
-      if (parsed.type === 'result' && typeof parsed.result === 'string') text = parsed.result;
-    } catch {
-      /* ignore */
-    }
-  }
-  return text;
 }
 
 function readStream(stream: NodeJS.ReadableStream): Promise<string> {

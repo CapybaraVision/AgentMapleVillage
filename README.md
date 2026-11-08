@@ -25,7 +25,7 @@
 
 메이플 서버는 집 PC의 localhost에 직접 닿지 못합니다. 커넥터가 릴레이로 **나갑니다**. 릴레이에는 셸, git, 데스크톱 실행 엔드포인트가 없습니다.
 
-자세한 설명은 [docs/architecture.md](docs/architecture.md), 보안은 [docs/security.md](docs/security.md), 월드에 붙이는 방법은 [docs/msw-setup.md](docs/msw-setup.md)입니다.
+자세한 설명은 [docs/architecture.md](docs/architecture.md), 보안은 [docs/security.md](docs/security.md), 월드에 붙이는 방법은 [docs/msw-setup.md](docs/msw-setup.md)와 [docs/creator-assembly.md](docs/creator-assembly.md)입니다. Windows 검사 절차는 [docs/windows-validate.md](docs/windows-validate.md)입니다. 가져오기용 `.modpackage`는 만들지 않았습니다. 메이플 서버는 집 PC의 `127.0.0.1`에 닿지 않고, 공개 HTTPS 배포는 하지 않습니다.
 
 ## 로컬에서 시뮬 돌리기
 
@@ -39,7 +39,7 @@ npm run audit
 npm run sim
 ```
 
-도서관과 화면 도우미를 넣은 뒤 `npm test`는 25개, `npm run typecheck`는 오류 없음, `npm run audit`는 취약점 0건입니다. 개발 의존성 Vitest는 5.1.0입니다.
+런타임 검사 절차를 넣은 뒤 `npm test`는 29개, `npm run typecheck`는 오류 없음, `npm run audit`는 취약점 0건입니다. 개발 의존성 Vitest는 5.1.0입니다. 이 숫자는 가짜 Claude입니다.
 
 `npm run sim`은 프로세스 안에서 릴레이와 커넥터를 띄우고, 한국어 목표 하나를 끝까지 진행합니다. 유료 모델 호출은 없습니다.
 

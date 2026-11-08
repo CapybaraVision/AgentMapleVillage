@@ -59,8 +59,8 @@ describe('Claude Code CLI driver', () => {
       calls.push({ command, args, shell: options.shell });
       const resumed = args.includes('--resume');
       const sessionLine = resumed
-        ? '{"type":"system","session_id":"sess_from_cli"}\n{"type":"result","result":"이어졌습니다","session_id":"sess_from_cli"}\n'
-        : '{"type":"system","session_id":"sess_from_cli"}\n{"type":"result","result":"시작","session_id":"sess_from_cli"}\n';
+        ? '{"session_id":"sess_from_cli","result":"이어졌습니다"}\n'
+        : '{"session_id":"sess_from_cli","result":"시작"}\n';
       return new FakeChild(sessionLine) as unknown as ReturnType<SpawnLike>;
     };
     const driver = new ClaudeCodeCliDriver({ enabled: true, command: 'claude', spawnImpl });
@@ -74,6 +74,9 @@ describe('Claude Code CLI driver', () => {
     expect(first.denied).toBe(false);
     expect(calls[0]?.shell).toBe(false);
     expect(calls[0]?.args).not.toContain('--resume');
+    expect(calls[0]?.args).not.toContain('--dangerously-skip-permissions');
+    expect(calls[0]?.args).toContain('--tools');
+    expect(calls[0]?.args[calls[0]!.args.indexOf('--tools') + 1]).toBe('');
     expect(calls[0]?.command).toBe('claude');
 
     const second = await driver.runTurn({

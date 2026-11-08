@@ -150,6 +150,7 @@ export class Relay {
         send(res, 200, { ok: true, service: 'agentmaple-relay', protocol: 1 });
         return;
       }
+      if (path === '/v1/time' && method === 'POST') return this.time(req, res);
       if (method !== 'POST') {
         send(res, 404, { ok: false, error: 'not_found', message: 'unknown route' });
         return;
@@ -220,7 +221,12 @@ export class Relay {
     this.pairingIndex.delete(pairing.codeHash);
     const issued = this.issueWorld(village, now);
     this.persist();
-    send(res, 200, { ok: true, villageId: village.id, ...issued });
+    send(res, 200, { ok: true, villageId: village.id, serverTime: now, epoch: 'unix-ms', ...issued });
+  }
+
+  private time(req: http.IncomingMessage, res: http.ServerResponse): void {
+    this.requireRole(req, 'world');
+    send(res, 200, { ok: true, serverTime: this.clock.now(), epoch: 'unix-ms' });
   }
 
   private refresh(res: http.ServerResponse, body: unknown): void {

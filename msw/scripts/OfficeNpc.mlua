@@ -12,6 +12,7 @@ script OfficeNpc extends Component
 	property string Station = "desk"
 	property string ActivityText = "대기 중"
 	property string OwnerUserId = ""
+	property boolean CaptureOwnerOnNextEnter = false
 	property number DeskX = 0
 	property number DeskY = 0
 	property boolean DeskSaved = false
@@ -36,8 +37,11 @@ script OfficeNpc extends Component
 	@ExecSpace("ServerOnly")
 	@EventSender("Service", "UserService")
 	handler HandleUserEnterEvent(UserEnterEvent event)
-		if self.OwnerUserId == "" then
+		-- UserService has no world-owner field. ProfileCode is not a relay credential.
+		-- The first player is not the owner unless the creator arms this switch.
+		if self.CaptureOwnerOnNextEnter == true and self.OwnerUserId == "" then
 			self.OwnerUserId = event.UserId
+			self.CaptureOwnerOnNextEnter = false
 		end
 	end
 
