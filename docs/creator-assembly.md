@@ -10,17 +10,35 @@
 node tools/deploy-msw-overlay.mjs C:\path\to\the\exported\LocalWorkspace
 ```
 
-스크립트는 덮어쓸 파일을 월드 폴더 바깥 `AgentMapleVillage-backup-<시각>`에 먼저 복사합니다. `Global/SectorConfig.config`가 없거나 `entries`가 문자열 배열이 아니면 그 파일은 고치지 않고 멈춥니다. `UseExtendedScriptFormat`이 true가 아니면 WorldConfig도 고치지 않습니다. 끝난 뒤 메이커에서 refresh가 필요합니다. 이 스크립트는 refresh와 play를 하지 않습니다.
+모든 검사는 첫 쓰기 전에 끝납니다. 통과한 뒤에만, 덮어쓸 파일을 월드 폴더 바깥 `AgentMapleVillage-backup-<시각>`에 복사합니다. 쓰다가 실패하면 그 백업으로 되돌립니다. 끝난 뒤 메이커에서 refresh가 필요합니다. 이 스크립트는 refresh와 play를 하지 않았고, 크리에이터에서 확인하지 않았습니다.
 
-시드가 꼭 필요합니다.
+공식 맵 빌더 문서(`builder-protocol-map.md`, `entity.md`, 스킬 커밋 `96133b2991d71b66bbe1e2494d28e4cc4bf57f82`)는 새 맵 id를 월드에서 열어야 할 때 `Global/SectorConfig.config`의 `entries`에 `map://{id}`를 넣어야 할 수 있다고 적습니다. SectorConfig 편집 자체는 빌더가 다루지 않는 항목입니다. 크리에이터 Basic 내보내기에는 그 파일이 없고 `map/map01.map`가 맵입니다. 이 스크립트는 SectorConfig를 만들지 않고, 파일 모양을 추측하지 않습니다.
 
-- 내보낸 LocalWorkspace 루트. `Global`, `map`, `ui`, `RootDesk`가 있어야 합니다.
-- `Global/WorldConfig.config`에 `"UseExtendedScriptFormat": true`.
-- `Global/SectorConfig.config`의 `entries`가 문자열 배열이면 `map://AgentMapleVillage`를 덧붙입니다. 모양이 다르면 파일을 보내 줘야 안전하게 넣을 수 있습니다.
+- 파일이 없으면 마을 엔티티를 기존 `map/map01.map`에 넣습니다. 별도 `map/AgentMapleVillage.map`는 복사하지 않습니다. NPC의 Body는 그 맵의 `TileMapMode`에 맞춥니다. 0은 Rigidbody, 1은 Kinematicbody, 2는 Sideviewbody입니다.
+- 파일이 있고 `entries`가 문자열 배열이면 `map://AgentMapleVillage`를 덧붙이고 별도 맵 파일을 복사합니다. `map01`은 그대로 둡니다.
+- `entries`가 문자열 배열이 아니거나 JSON이 아니면 아무 파일도 쓰지 않습니다.
+
+`UseExtendedScriptFormat`은 `ContentProto.Json` 아래이거나 파일 맨 위에 `true`여야 합니다. 아니면 WorldConfig를 고치지 않고 멈춥니다.
+
+꼭 있어야 하는 것:
+
+- 내보낸 LocalWorkspace의 `Global`, `map`, `ui`, `RootDesk`.
+- `Global/WorldConfig.config`의 확장 스크립트 형식.
+- SectorConfig가 없을 때 `map/map01.map`. `ContentType`은 `x-mod/map`이고, `MapComponent.TileMapMode`는 0, 1, 2 중 하나입니다.
+
+없어도 되는 것:
+
+- `Global/SectorConfig.config`
+- `Environment`
+- UIPopup, UIToast, `.codeblock`
+
+추가로 받아야 하는 시드 파일은 없습니다. 맵에 넣을 엔티티와 UI는 이미 `msw/workspace-overlay`에 있습니다.
+
+`npm run sim`은 이 프로세스 안에서 목표를 끝까지 진행합니다. 메이플 세션을 열지 않고 Claude를 호출하지 않습니다.
 
 ## 들어 있는 것
 
-- `map/AgentMapleVillage.map`: 공식 사이드뷰 템플릿. TileMapMode 2. 책상 6. 세션 NPC는 `ses_foreman`(S01)과 `ses_worker`(S02)만. 나머지 책상은 빈 자리입니다.
+- `map/AgentMapleVillage.map`: 공식 사이드뷰 템플릿으로 만든 원본. TileMapMode 2. 책상 6. 세션 NPC는 `ses_foreman`(S01)과 `ses_worker`(S02)만. 나머지 책상은 빈 자리입니다. SectorConfig가 없는 Basic 월드에서는 이 파일 대신 `map01`에 같은 엔티티를 넣습니다.
 - `ui/AgentMapleDesk.ui`, `ui/AgentMapleLibrary.ui`: 지휘석과 도서관. 지식 그래프 그림이 아니라 검색, 본문, 이웃 목록입니다.
 - `RootDesk/MyDesk/AgentMapleVillage/*.mlua`: 확장 스크립트 형식의 원본.
 
@@ -28,7 +46,7 @@ node tools/deploy-msw-overlay.mjs C:\path\to\the\exported\LocalWorkspace
 
 공식 문서(Utilization of Packages, postId 647)에서 패키지는 크리에이터의 Workspace에서 Export To Package로 저장하고, Import Package로 다시 넣습니다. 리소스를 넣으려면 월드가 서버에 저장된 RUID가 필요합니다. 네이티브 항목은 그대로 패키지에 넣지 못합니다. `.mod` 전체 월드 파일의 바이트 형식은 그 문서에 없습니다.
 
-그래서 이 저장소는 가져오기용 `.mod`나 `.modpackage`를 만들지 않습니다. 만들면 크리에이터가 연다고 보장할 수 없습니다. 아래는 빈 월드에 사람이 붙이는 최소 절차입니다. 맵과 그래프 그림은 아직 없습니다.
+그래서 이 저장소는 가져오기용 `.mod`나 `.modpackage`를 만들지 않습니다. 만들면 크리에이터가 연다고 보장할 수 없습니다. 위 배포가 Basic 월드의 `map01`과 UI 파일을 넣는 경로입니다. 아래는 그 파일을 쓰지 않을 때 사람이 빈 월드에 붙이는 절차입니다. 지식 그래프 그림은 만들지 않습니다.
 
 ## 순서
 

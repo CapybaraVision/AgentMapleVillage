@@ -15,20 +15,194 @@ function entities(file: { ContentProto?: { Entities?: Array<{ path?: string; jso
   return file.ContentProto?.Entities ?? [];
 }
 
-describe('backup-safe deploy', () => {
-  it('copies the overlay and refuses to invent SectorConfig', () => {
-    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'amv-ws-'));
-    for (const dir of ['Global', 'map', 'ui', 'RootDesk']) fs.mkdirSync(path.join(workspace, dir));
-    fs.writeFileSync(path.join(workspace, 'Global/WorldConfig.config'), '{ "UseExtendedScriptFormat": true }\n');
-    fs.writeFileSync(path.join(workspace, 'map/old.map'), 'keep\n');
-    const deploy = path.resolve(overlay, '../../tools/deploy-msw-overlay.mjs');
-    const result = spawnSync(process.execPath, [deploy, workspace], { encoding: 'utf8' });
-    expect(result.status).toBe(2);
-    expect(result.stderr).toContain('MISSING SEED: Global/SectorConfig.config');
-    expect(fs.readFileSync(path.join(workspace, 'map/old.map'), 'utf8')).toBe('keep\n');
-    expect(fs.existsSync(path.join(workspace, 'map/AgentMapleVillage.map'))).toBe(true);
+const deploy = path.resolve(overlay, '../../tools/deploy-msw-overlay.mjs');
+
+function basicWorkspace(mode = 0, stringJson = false): { parent: string; workspace: string; mapBytes: string } {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'amv-parent-'));
+  const workspace = path.join(parent, 'MapleAIgent');
+  fs.mkdirSync(path.join(workspace, 'Global'), { recursive: true });
+  fs.mkdirSync(path.join(workspace, 'map'), { recursive: true });
+  fs.mkdirSync(path.join(workspace, 'ui'), { recursive: true });
+  fs.mkdirSync(path.join(workspace, 'RootDesk/MyDesk'), { recursive: true });
+  fs.mkdirSync(path.join(workspace, 'Environment'), { recursive: true });
+  fs.writeFileSync(path.join(workspace, 'Environment/config'), 'keep-env\n');
+  fs.writeFileSync(path.join(workspace, 'Global/WorldConfig.config'), `${JSON.stringify({
+    ContentProto: { Json: { UseExtendedScriptFormat: true, SourceLanguage: 'ko' } },
+  })}\n`);
+  fs.writeFileSync(path.join(workspace, 'RootDesk/MyDesk/UIPopup.codeblock'), 'keep-block\n');
+  fs.writeFileSync(path.join(workspace, 'RootDesk/MyDesk/UIPopup.mlua'), 'keep-popup\n');
+  fs.writeFileSync(path.join(workspace, 'ui/DefaultGroup.ui'), 'keep-ui\n');
+  const rootJson = {
+    name: 'map01',
+    path: '/maps/map01',
+    '@components': [{ '@type': 'MOD.Core.MapComponent', TileMapMode: mode }],
+  };
+  const map = {
+    ContentType: 'x-mod/map',
+    EntryKey: 'map://map01',
+    ContentProto: {
+      Entities: [{
+        id: '11111111-1111-4111-8111-111111111111',
+        path: '/maps/map01',
+        componentNames: 'MOD.Core.MapComponent',
+        jsonString: stringJson ? JSON.stringify(rootJson) : rootJson,
+      }],
+    },
+  };
+  const mapBytes = `${JSON.stringify(map)}\n`;
+  fs.writeFileSync(path.join(workspace, 'map/map01.map'), mapBytes);
+  return { parent, workspace, mapBytes };
+}
+
+function runDeploy(workspace: string): { status: number | null; stdout: string; stderr: string } {
+  const result = spawnSync(process.execPath, [deploy, workspace], { encoding: 'utf8' });
+  return { status: result.status, stdout: result.stdout, stderr: result.stderr };
+}
+
+describe('Basic workspace deploy', () => {
+  it('places the village on map01 when SectorConfig is absent and writes nothing before the checks pass', () => {
+    const { parent, workspace, mapBytes } = basicWorkspace(0, true);
+    const worldBefore = fs.readFileSync(path.join(workspace, 'Global/WorldConfig.config'), 'utf8');
+    const result = runDeploy(workspace);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('No SectorConfig file was created');
+    expect(fs.existsSync(path.join(workspace, 'Global/SectorConfig.config'))).toBe(false);
+    expect(fs.existsSync(path.join(workspace, 'map/AgentMapleVillage.map'))).toBe(false);
+    expect(fs.readFileSync(path.join(workspace, 'Global/WorldConfig.config'), 'utf8')).toBe(worldBefore);
+    expect(fs.readFileSync(path.join(workspace, 'Environment/config'), 'utf8')).toBe('keep-env\n');
+    expect(fs.readFileSync(path.join(workspace, 'RootDesk/MyDesk/UIPopup.mlua'), 'utf8')).toBe('keep-popup\n');
+    expect(fs.readFileSync(path.join(workspace, 'RootDesk/MyDesk/UIPopup.codeblock'), 'utf8')).toBe('keep-block\n');
+    expect(fs.readFileSync(path.join(workspace, 'ui/DefaultGroup.ui'), 'utf8')).toBe('keep-ui\n');
     expect(fs.existsSync(path.join(workspace, 'ui/AgentMapleDesk.ui'))).toBe(true);
+    expect(fs.existsSync(path.join(workspace, 'ui/AgentMapleLibrary.ui'))).toBe(true);
+    const written = JSON.parse(fs.readFileSync(path.join(workspace, 'map/map01.map'), 'utf8')) as {
+      ContentProto: { Entities: Array<{ path?: string; jsonString?: string | { path?: string; '@components'?: Array<Record<string, unknown>> } }> };
+    };
+    const root = written.ContentProto.Entities.find((entity) => entity.path === '/maps/map01');
+    expect(typeof root?.jsonString).toBe('string');
+    const foreman = written.ContentProto.Entities.find((entity) => entity.path === '/maps/map01/Foreman');
+    expect(foreman).toBeTruthy();
+    const foremanJson = typeof foreman?.jsonString === 'string' ? JSON.parse(foreman.jsonString) as { '@components'?: Array<Record<string, unknown>> } : foreman?.jsonString;
+    const types = (foremanJson?.['@components'] ?? []).map((component) => component['@type']);
+    expect(types).toContain('MOD.Core.RigidbodyComponent');
+    expect(types).not.toContain('MOD.Core.SideviewbodyComponent');
+    const relay = written.ContentProto.Entities.find((entity) => entity.path === '/maps/map01/VillageRelay');
+    const relayJson = typeof relay?.jsonString === 'string' ? JSON.parse(relay.jsonString) as { '@components'?: Array<Record<string, unknown>> } : relay?.jsonString;
+    const relayScript = relayJson?.['@components']?.find((component) => component['@type'] === 'script.VillageRelay');
+    expect(relayScript?.ForemanNpcPath).toBe('/maps/map01/Foreman');
+    expect(fs.readFileSync(path.join(workspace, 'RootDesk/MyDesk/AgentMapleVillage/VillageRelay.mlua'), 'utf8')).toContain('/maps/map01/Foreman');
+    expect(fs.readFileSync(path.join(workspace, 'RootDesk/MyDesk/AgentMapleVillage/GoalDesk.mlua'), 'utf8')).toContain('/maps/map01/VillageRelay');
     expect(fs.readFileSync(path.join(workspace, 'RootDesk/MyDesk/AgentMapleVillage/OfficeNpc.mlua'), 'utf8')).toContain('ses_worker');
+    expect(fs.readdirSync(path.join(workspace, 'RootDesk/MyDesk/AgentMapleVillage')).some((name) => name.endsWith('.codeblock'))).toBe(false);
+    const backups = fs.readdirSync(parent).filter((name) => name.startsWith('AgentMapleVillage-backup-'));
+    expect(backups).toHaveLength(1);
+    const backup = path.join(parent, backups[0]);
+    expect(backup.startsWith(`${workspace}${path.sep}`)).toBe(false);
+    expect(fs.readFileSync(path.join(backup, 'map/map01.map'), 'utf8')).toBe(mapBytes);
+    const again = runDeploy(workspace);
+    expect(again.status).toBe(0);
+    const second = JSON.parse(fs.readFileSync(path.join(workspace, 'map/map01.map'), 'utf8')) as {
+      ContentProto: { Entities: Array<{ path?: string }> };
+    };
+    expect(second.ContentProto.Entities.filter((entity) => entity.path === '/maps/map01/Foreman')).toHaveLength(1);
+    expect(second.ContentProto.Entities.filter((entity) => entity.path?.startsWith('/maps/map01/Desk'))).toHaveLength(6);
+  });
+
+  it('keeps Sideviewbody when map01 is already TileMapMode 2', () => {
+    const { workspace } = basicWorkspace(2, false);
+    expect(runDeploy(workspace).status).toBe(0);
+    const written = JSON.parse(fs.readFileSync(path.join(workspace, 'map/map01.map'), 'utf8')) as {
+      ContentProto: { Entities: Array<{ path?: string; jsonString?: { '@components'?: Array<Record<string, unknown>> } }> };
+    };
+    const foreman = written.ContentProto.Entities.find((entity) => entity.path === '/maps/map01/Foreman');
+    const types = (foreman?.jsonString?.['@components'] ?? []).map((component) => component['@type']);
+    expect(types).toContain('MOD.Core.SideviewbodyComponent');
+    expect(types).not.toContain('MOD.Core.RigidbodyComponent');
+  });
+
+  it('rejects a SectorConfig whose entries are not a string array before any write', () => {
+    for (const entries of [1, { 'map://map01': true }, null]) {
+      const { parent, workspace, mapBytes } = basicWorkspace();
+      fs.writeFileSync(path.join(workspace, 'Global/SectorConfig.config'), `${JSON.stringify({ entries })}\n`);
+      const sectorBytes = fs.readFileSync(path.join(workspace, 'Global/SectorConfig.config'), 'utf8');
+      const result = runDeploy(workspace);
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain('SectorConfig.entries is not a string array');
+      expect(result.stdout).not.toContain('wrote ');
+      expect(fs.readFileSync(path.join(workspace, 'map/map01.map'), 'utf8')).toBe(mapBytes);
+      expect(fs.readFileSync(path.join(workspace, 'Global/SectorConfig.config'), 'utf8')).toBe(sectorBytes);
+      expect(fs.existsSync(path.join(workspace, 'ui/AgentMapleDesk.ui'))).toBe(false);
+      expect(fs.existsSync(path.join(workspace, 'map/AgentMapleVillage.map'))).toBe(false);
+      expect(fs.readdirSync(parent).filter((name) => name.startsWith('AgentMapleVillage-backup-'))).toHaveLength(0);
+    }
+  });
+
+  it('rejects unreadable SectorConfig JSON before any write', () => {
+    const { parent, workspace, mapBytes } = basicWorkspace();
+    fs.writeFileSync(path.join(workspace, 'Global/SectorConfig.config'), '{ entries: [\n');
+    const result = runDeploy(workspace);
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('SectorConfig.config is not JSON');
+    expect(fs.readFileSync(path.join(workspace, 'map/map01.map'), 'utf8')).toBe(mapBytes);
+    expect(fs.existsSync(path.join(workspace, 'ui/AgentMapleDesk.ui'))).toBe(false);
+    expect(fs.readdirSync(parent).filter((name) => name.startsWith('AgentMapleVillage-backup-'))).toHaveLength(0);
+  });
+
+  it('appends a map id only when entries is already a string array', () => {
+    const { workspace, mapBytes } = basicWorkspace();
+    fs.writeFileSync(path.join(workspace, 'Global/SectorConfig.config'), `${JSON.stringify({ entries: ['map://map01'] })}\n`);
+    const result = runDeploy(workspace);
+    expect(result.status).toBe(0);
+    expect(fs.readFileSync(path.join(workspace, 'map/map01.map'), 'utf8')).toBe(mapBytes);
+    const sector = JSON.parse(fs.readFileSync(path.join(workspace, 'Global/SectorConfig.config'), 'utf8')) as { entries: string[] };
+    expect(sector.entries).toEqual(['map://map01', 'map://AgentMapleVillage']);
+    expect(fs.existsSync(path.join(workspace, 'map/AgentMapleVillage.map'))).toBe(true);
+    expect(fs.readFileSync(path.join(workspace, 'RootDesk/MyDesk/AgentMapleVillage/VillageRelay.mlua'), 'utf8')).toContain('/maps/AgentMapleVillage/Foreman');
+  });
+
+  it('does not write when WorldConfig or map01 is not a supported Basic seed', () => {
+    const missingWorld = basicWorkspace();
+    fs.rmSync(path.join(missingWorld.workspace, 'Global/WorldConfig.config'));
+    const noWorld = runDeploy(missingWorld.workspace);
+    expect(noWorld.status).toBe(2);
+    expect(noWorld.stderr).toContain('MISSING SEED: Global/WorldConfig.config');
+    expect(fs.existsSync(path.join(missingWorld.workspace, 'ui/AgentMapleDesk.ui'))).toBe(false);
+    expect(fs.readdirSync(missingWorld.parent).filter((name) => name.startsWith('AgentMapleVillage-backup-'))).toHaveLength(0);
+
+    const disabled = basicWorkspace();
+    fs.writeFileSync(path.join(disabled.workspace, 'Global/WorldConfig.config'), `${JSON.stringify({
+      ContentProto: { Json: { UseExtendedScriptFormat: false, SourceLanguage: 'ko' } },
+    })}\n`);
+    expect(runDeploy(disabled.workspace).status).toBe(2);
+    expect(fs.readFileSync(path.join(disabled.workspace, 'map/map01.map'), 'utf8')).toBe(disabled.mapBytes);
+    expect(fs.existsSync(path.join(disabled.workspace, 'ui/AgentMapleDesk.ui'))).toBe(false);
+
+    const missingMap = basicWorkspace();
+    fs.rmSync(path.join(missingMap.workspace, 'map/map01.map'));
+    const noMap = runDeploy(missingMap.workspace);
+    expect(noMap.status).toBe(2);
+    expect(noMap.stderr).toContain('MISSING SEED: map/map01.map');
+    expect(fs.existsSync(path.join(missingMap.workspace, 'ui/AgentMapleDesk.ui'))).toBe(false);
+    expect(fs.readdirSync(missingMap.parent).filter((name) => name.startsWith('AgentMapleVillage-backup-'))).toHaveLength(0);
+  });
+
+  it('rolls back a mid-write failure and leaves no partial village files', () => {
+    const { parent, workspace, mapBytes } = basicWorkspace();
+    const backup = path.join(parent, 'explicit-backup');
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+      import { deployWorkspace } from ${JSON.stringify(deploy)};
+      const outcome = deployWorkspace(process.env.WS, { failAfter: 2, backup: process.env.BAK });
+      process.exit(outcome.code);
+    `], { encoding: 'utf8', env: { ...process.env, WS: workspace, BAK: backup } });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('injected write failure');
+    expect(fs.readFileSync(path.join(workspace, 'map/map01.map'), 'utf8')).toBe(mapBytes);
+    expect(fs.existsSync(path.join(workspace, 'RootDesk/MyDesk/AgentMapleVillage'))).toBe(false);
+    expect(fs.existsSync(path.join(workspace, 'ui/AgentMapleDesk.ui'))).toBe(false);
+    expect(fs.existsSync(path.join(workspace, 'Global/SectorConfig.config'))).toBe(false);
+    expect(backup.startsWith(`${workspace}${path.sep}`)).toBe(false);
+    expect(fs.readFileSync(path.join(backup, 'map/map01.map'), 'utf8')).toBe(mapBytes);
+    expect(fs.readdirSync(workspace, { recursive: true }).some((name) => String(name).endsWith('.amv-tmp'))).toBe(false);
   });
 });
 
