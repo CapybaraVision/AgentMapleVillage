@@ -14,7 +14,7 @@
     "Use": "Binary",
     "Entities": [
       {
-        "id": "4bd82075-2c27-4b7b-952c-effda6f6b862",
+        "id": "79da22ab-743b-473c-971e-05de7e0406a7",
         "path": "/maps/AgentMapleVillage",
         "componentNames": "MOD.Core.MapComponent,MOD.Core.FootholdComponent",
         "jsonString": {
@@ -52,7 +52,7 @@
         }
       },
       {
-        "id": "f30e4fac-4ed2-428e-9f44-d2676c93ac43",
+        "id": "b26e9dec-bb14-4f5a-acbb-c1777da8caa7",
         "path": "/maps/AgentMapleVillage/Background",
         "componentNames": "MOD.Core.BackgroundComponent",
         "jsonString": {
@@ -85,7 +85,7 @@
         }
       },
       {
-        "id": "5bbd5df0-58da-4341-acb5-e31f21d09cdf",
+        "id": "770f7cd5-527a-434d-896c-a0349f7fd9ca",
         "path": "/maps/AgentMapleVillage/MapleMapLayer",
         "componentNames": "MOD.Core.MapLayerComponent",
         "jsonString": {
@@ -121,7 +121,7 @@
         }
       },
       {
-        "id": "4c6ad4e5-353d-43db-abfd-327c31e6e7e6",
+        "id": "a8fe94ae-aa4d-49e2-ac4e-facd28014d00",
         "path": "/maps/AgentMapleVillage/SpawnLocation",
         "componentNames": "MOD.Core.TransformComponent,MOD.Core.SpriteRendererComponent,MOD.Core.SpawnLocationComponent",
         "jsonString": {
@@ -197,7 +197,7 @@
         }
       },
       {
-        "id": "397e4a9d-2eae-4c25-a752-001d04173be6",
+        "id": "f51b1b48-7bc3-47e0-91be-c6e3d2c781cc",
         "path": "/maps/AgentMapleVillage/RectTileMap",
         "componentNames": "MOD.Core.TransformComponent,MOD.Core.RectTileMapComponent",
         "jsonString": {
@@ -613,7 +613,7 @@
         }
       },
       {
-        "id": "cc1e99e6-1769-4d4c-8856-ac17c3bde7ed",
+        "id": "cf719fdc-c94c-419c-816a-3c062e6c2046",
         "path": "/maps/AgentMapleVillage/Desk1",
         "componentNames": "MOD.Core.TransformComponent,MOD.Core.SpriteRendererComponent,MOD.Core.NameTagComponent",
         "jsonString": {
@@ -677,13 +677,13 @@
             "type": "Model",
             "entry_id": "mapobject",
             "sub_entity_id": null,
-            "root_entity_id": "cc1e99e6-1769-4d4c-8856-ac17c3bde7ed",
+            "root_entity_id": "cf719fdc-c94c-419c-816a-3c062e6c2046",
             "replaced_model_id": null
           }
         }
       },
       {
-        "id": "2e143c6a-1b0e-4af3-8b0b-939c20f7ccb8",
+        "id": "bf272ed4-a7dc-47b1-8dda-89757d98c6f7",
         "path": "/maps/AgentMapleVillage/Desk2",
         "componentNames": "MOD.Core.TransformComponent,MOD.Core.SpriteRendererComponent,MOD.Core.NameTagComponent",
         "jsonString": {
@@ -747,13 +747,13 @@
             "type": "Model",
             "entry_id": "mapobject",
             "sub_entity_id": null,
-            "root_entity_id": "2e143c6a-1b0e-4af3-8b0b-939c20f7ccb8",
+            "root_entity_id": "bf272ed4-a7dc-47b1-8dda-89757d98c6f7",
             "replaced_model_id": null
           }
         }
       },
       {
-        "id": "314b749b-aa30-41e7-a1ed-9e63390080a9",
+        "id": "10c57391-5ba5-46d6-8e24-49ba7588c97c",
         "path": "/maps/AgentMapleVillage/Desk3",
         "componentNames": "MOD.Core.TransformComponent,MOD.Core.SpriteRendererComponent,MOD.Core.NameTagComponent",
         "jsonString": {
@@ -817,13 +817,13 @@
             "type": "Model",
             "entry_id": "mapobject",
             "sub_entity_id": null,
-            "root_entity_id": "314b749b-aa30-41e7-a1ed-9e63390080a9",
+            "root_entity_id": "10c57391-5ba5-46d6-8e24-49ba7588c97c",
             "replaced_model_id": null
           }
         }
       },
       {
-        "id": "cbeb309b-6fb6-4078-9abf-a35d87b80475",
+        "id": "19f10027-f137-43dc-8b3d-188dbd07e779",
         "path": "/maps/AgentMapleVillage/Desk4",
         "componentNames": "MOD.Core.TransformComponent,MOD.Core.SpriteRendererComponent,MOD.Core.NameTagComponent",
         "jsonString": {
@@ -887,13 +887,13 @@
             "type": "Model",
             "entry_id": "mapobject",
             "sub_entity_id": null,
-            "root_entity_id": "cbeb309b-6fb6-4078-9abf-a35d87b80475",
+            "root_entity_id": "19f10027-f137-43dc-8b3d-188dbd07e779",
             "replaced_model_id": null
           }
         }
       },
       {
-        "id": "9ee1e98d-a717-4643-8457-7a8a5ba7d189",
+        "id": "3fc52eeb-f0cd-4871-8183-f8c8a0d238ea",
         "path": "/maps/AgentMapleVillage/Desk5",
         "componentNames": "MOD.Core.TransformComponent,MOD.Core.SpriteRendererComponent,MOD.Core.NameTagComponent",
         "jsonString": {
@@ -957,13 +957,13 @@
             "type": "Model",
             "entry_id": "mapobject",
             "sub_entity_id": null,
-            "root_entity_id": "9ee1e98d-a717-4643-8457-7a8a5ba7d189",
+            "root_entity_id": "3fc52eeb-f0cd-4871-8183-f8c8a0d238ea",
             "replaced_model_id": null
           }
         }
       },
       {
-        "id": "119bde8b-bb0f-4011-b9d0-967770ba9a2c",
+        "id": "cf77d94c-c4dd-422d-8eeb-bf5c36e58365",
         "path": "/maps/AgentMapleVillage/Desk6",
         "componentNames": "MOD.Core.TransformComponent,MOD.Core.SpriteRendererComponent,MOD.Core.NameTagComponent",
         "jsonString": {
@@ -1027,13 +1027,13 @@
             "type": "Model",
             "entry_id": "mapobject",
             "sub_entity_id": null,
-            "root_entity_id": "119bde8b-bb0f-4011-b9d0-967770ba9a2c",
+            "root_entity_id": "cf77d94c-c4dd-422d-8eeb-bf5c36e58365",
             "replaced_model_id": null
           }
         }
       },
       {
-        "id": "0ea23540-5dc7-4b37-928b-9121af600f26",
+        "id": "b11e766d-2203-4fb5-9171-dab8981d2663",
         "path": "/maps/AgentMapleVillage/Foreman",
         "componentNames": "MOD.Core.TransformComponent,MOD.Core.SpriteRendererComponent,MOD.Core.NameTagComponent,MOD.Core.ChatBalloonComponent,MOD.Core.MovementComponent,MOD.Core.SideviewbodyComponent,script.OfficeNpc,MOD.Core.TouchReceiveComponent,script.OfficeStatus",
         "jsonString": {
@@ -1133,13 +1133,13 @@
             "type": "Model",
             "entry_id": "mapobject",
             "sub_entity_id": null,
-            "root_entity_id": "0ea23540-5dc7-4b37-928b-9121af600f26",
+            "root_entity_id": "b11e766d-2203-4fb5-9171-dab8981d2663",
             "replaced_model_id": null
           }
         }
       },
       {
-        "id": "495def12-4a7e-4d5d-85d3-46ecb86198ea",
+        "id": "90a21647-7334-42a6-81ff-a5543cd28e3a",
         "path": "/maps/AgentMapleVillage/Worker",
         "componentNames": "MOD.Core.TransformComponent,MOD.Core.SpriteRendererComponent,MOD.Core.NameTagComponent,MOD.Core.ChatBalloonComponent,MOD.Core.MovementComponent,MOD.Core.SideviewbodyComponent,script.OfficeNpc,MOD.Core.TouchReceiveComponent,script.OfficeStatus",
         "jsonString": {
@@ -1239,13 +1239,13 @@
             "type": "Model",
             "entry_id": "mapobject",
             "sub_entity_id": null,
-            "root_entity_id": "495def12-4a7e-4d5d-85d3-46ecb86198ea",
+            "root_entity_id": "90a21647-7334-42a6-81ff-a5543cd28e3a",
             "replaced_model_id": null
           }
         }
       },
       {
-        "id": "74d8f01c-bc55-404b-aebf-9f4f624be149",
+        "id": "f0da11f0-6649-4e4f-86cb-9ad5f3564087",
         "path": "/maps/AgentMapleVillage/Guide",
         "componentNames": "MOD.Core.TransformComponent,MOD.Core.SpriteRendererComponent,MOD.Core.NameTagComponent,MOD.Core.ChatBalloonComponent,script.GuidePost",
         "jsonString": {
@@ -1317,13 +1317,13 @@
             "type": "Model",
             "entry_id": "mapobject",
             "sub_entity_id": null,
-            "root_entity_id": "74d8f01c-bc55-404b-aebf-9f4f624be149",
+            "root_entity_id": "f0da11f0-6649-4e4f-86cb-9ad5f3564087",
             "replaced_model_id": null
           }
         }
       },
       {
-        "id": "6922587a-e3a8-49a8-876a-07294dbec89c",
+        "id": "e6fb7df9-7b30-49c2-b7ed-cf2913bc94bf",
         "path": "/maps/AgentMapleVillage/NoticeBoard",
         "componentNames": "MOD.Core.TransformComponent,MOD.Core.SpriteRendererComponent,MOD.Core.NameTagComponent,MOD.Core.ChatBalloonComponent,MOD.Core.TouchReceiveComponent,script.NoticeBoard",
         "jsonString": {
@@ -1399,13 +1399,13 @@
             "type": "Model",
             "entry_id": "mapobject",
             "sub_entity_id": null,
-            "root_entity_id": "6922587a-e3a8-49a8-876a-07294dbec89c",
+            "root_entity_id": "e6fb7df9-7b30-49c2-b7ed-cf2913bc94bf",
             "replaced_model_id": null
           }
         }
       },
       {
-        "id": "9d6678fc-b309-4ebf-8c9e-80e08c4d207e",
+        "id": "6ca150d4-ea9d-41dc-b6cc-dd13d279665d",
         "path": "/maps/AgentMapleVillage/BookWork",
         "componentNames": "MOD.Core.TransformComponent,MOD.Core.SpriteRendererComponent,MOD.Core.NameTagComponent,MOD.Core.ChatBalloonComponent,MOD.Core.TouchReceiveComponent,script.BookSpot",
         "jsonString": {
@@ -1484,13 +1484,13 @@
             "type": "Model",
             "entry_id": "mapobject",
             "sub_entity_id": null,
-            "root_entity_id": "9d6678fc-b309-4ebf-8c9e-80e08c4d207e",
+            "root_entity_id": "6ca150d4-ea9d-41dc-b6cc-dd13d279665d",
             "replaced_model_id": null
           }
         }
       },
       {
-        "id": "e3ba0830-f663-4c1f-b398-0b2a3239b890",
+        "id": "a422b179-eb8d-47fd-9bf4-c928dcab1b3d",
         "path": "/maps/AgentMapleVillage/BookSource",
         "componentNames": "MOD.Core.TransformComponent,MOD.Core.SpriteRendererComponent,MOD.Core.NameTagComponent,MOD.Core.ChatBalloonComponent,MOD.Core.TouchReceiveComponent,script.BookSpot",
         "jsonString": {
@@ -1569,13 +1569,13 @@
             "type": "Model",
             "entry_id": "mapobject",
             "sub_entity_id": null,
-            "root_entity_id": "e3ba0830-f663-4c1f-b398-0b2a3239b890",
+            "root_entity_id": "a422b179-eb8d-47fd-9bf4-c928dcab1b3d",
             "replaced_model_id": null
           }
         }
       },
       {
-        "id": "958de8bf-87dd-4c26-8430-3f306ee50679",
+        "id": "62698da8-9014-4d1f-950b-4ca7342b9691",
         "path": "/maps/AgentMapleVillage/VillageRelay",
         "componentNames": "MOD.Core.TransformComponent,script.VillageRelay",
         "jsonString": {
@@ -1635,7 +1635,7 @@
             "type": "Model",
             "entry_id": "mapempty",
             "sub_entity_id": null,
-            "root_entity_id": "958de8bf-87dd-4c26-8430-3f306ee50679",
+            "root_entity_id": "62698da8-9014-4d1f-950b-4ca7342b9691",
             "replaced_model_id": null
           }
         }

@@ -44,6 +44,8 @@ describe('msw script contract', () => {
     expect(desk).not.toContain('@EventSender("Entity"');
     expect(hall).toContain('ConnectEvent(ButtonClickEvent');
     expect(hall).not.toContain('@EventSender("Entity"');
+    const withoutComments = all.replace(/--\[\[[\s\S]*?\]\]/g, '').replace(/--.*$/gm, '');
+    expect(withoutComments).not.toMatch(/method\s+\S+\s+\w+\s*\([^)]*\bany\s+/);
     const code = all.replace(/--\[\[[\s\S]*?\]\]/g, '').replace(/--.*$/gm, '');
     expect(code).not.toMatch(/WebSocket|websocket|os\.execute|io\.popen|RequestAndWait|RUID|\.modpackage/);
     expect(all).toContain('UNVERIFIED');

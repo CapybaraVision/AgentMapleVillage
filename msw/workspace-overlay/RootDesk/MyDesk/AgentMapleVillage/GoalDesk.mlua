@@ -14,13 +14,14 @@ script GoalDesk extends Component
 	property string ResultTextPath = "/ui/AgentMapleDesk/Board/ResultText"
 	property string BoardPath = "/ui/AgentMapleDesk/Board"
 	property string OtherBoardPath = "/ui/AgentMapleLibrary/Board"
-	-- ButtonClickEvent is registered at runtime. A path in @EventSender does not subscribe the click,
-	-- so the press falls through to the world chat ("메시지를 입력할 수 있습니다.").
-	property ButtonComponent OpenButton = "123756e0-b44a-40b3-9774-cc4a2f9ee7af"
-	property ButtonComponent PairButton = "66703204-6fa8-4126-b21a-c88a9f7b1682"
-	property ButtonComponent GoalButton = "f820a76f-f0fb-4bf0-997e-183317804007"
-	property ButtonComponent AcceptButton = "7c10b483-49a2-4055-8b11-a58aa9887ece"
-	property ButtonComponent DenyButton = "ab58bf1c-cca7-4ad7-82e2-4e365dc0cf1c"
+	-- Click wiring matches the official UI runtime skeleton: ConnectEvent on the button entity.
+	-- A helper method with an any parameter is not in that skeleton. Maker refresh of that form
+	-- reported LEA-3015 on this file. The chat-only click is still not diagnosed.
+	property ButtonComponent OpenButton = "878f154f-ac5c-4ca6-9065-ae867c631fd0"
+	property ButtonComponent PairButton = "9ada6ad4-d2a9-438d-b35f-e9d69aba4fe2"
+	property ButtonComponent GoalButton = "060e9c63-fe5a-4bb4-a15c-daba72b0dfbc"
+	property ButtonComponent AcceptButton = "1c6d4633-175d-4cce-a136-6c6cfda38ebb"
+	property ButtonComponent DenyButton = "920883d2-eef3-4b41-a605-346acd8d95c5"
 	property any OpenHandler = nil
 	property any PairHandler = nil
 	property any GoalHandler = nil
@@ -33,34 +34,39 @@ script GoalDesk extends Component
 		self:WriteText(self.StatusTextPath, "공개 릴레이가 없습니다.")
 		self:WriteText(self.QuestionTextPath, "질문이 오면 여기에 표시됩니다.")
 		self:WriteText(self.ResultTextPath, "")
-		self.OpenHandler = self:Listen(self.OpenButton, self.OnOpenClick)
-		self.PairHandler = self:Listen(self.PairButton, self.OnPairClick)
-		self.GoalHandler = self:Listen(self.GoalButton, self.OnGoalClick)
-		self.AcceptHandler = self:Listen(self.AcceptButton, self.OnAcceptClick)
-		self.DenyHandler = self:Listen(self.DenyButton, self.OnDenyClick)
+		if self.OpenButton ~= nil and self.OpenButton.Entity ~= nil then
+			self.OpenHandler = self.OpenButton.Entity:ConnectEvent(ButtonClickEvent, self.OnOpenClick)
+		end
+		if self.PairButton ~= nil and self.PairButton.Entity ~= nil then
+			self.PairHandler = self.PairButton.Entity:ConnectEvent(ButtonClickEvent, self.OnPairClick)
+		end
+		if self.GoalButton ~= nil and self.GoalButton.Entity ~= nil then
+			self.GoalHandler = self.GoalButton.Entity:ConnectEvent(ButtonClickEvent, self.OnGoalClick)
+		end
+		if self.AcceptButton ~= nil and self.AcceptButton.Entity ~= nil then
+			self.AcceptHandler = self.AcceptButton.Entity:ConnectEvent(ButtonClickEvent, self.OnAcceptClick)
+		end
+		if self.DenyButton ~= nil and self.DenyButton.Entity ~= nil then
+			self.DenyHandler = self.DenyButton.Entity:ConnectEvent(ButtonClickEvent, self.OnDenyClick)
+		end
 	end
 
 	@ExecSpace("ClientOnly")
 	method void OnEndPlay()
-		self:Silence(self.OpenButton, self.OpenHandler)
-		self:Silence(self.PairButton, self.PairHandler)
-		self:Silence(self.GoalButton, self.GoalHandler)
-		self:Silence(self.AcceptButton, self.AcceptHandler)
-		self:Silence(self.DenyButton, self.DenyHandler)
-	end
-
-	@ExecSpace("ClientOnly")
-	method any Listen(ButtonComponent button, any handler)
-		if button == nil or button.Entity == nil then
-			return nil
+		if self.OpenButton ~= nil and self.OpenButton.Entity ~= nil and self.OpenHandler ~= nil then
+			self.OpenButton.Entity:DisconnectEvent(ButtonClickEvent, self.OpenHandler)
 		end
-		return button.Entity:ConnectEvent(ButtonClickEvent, handler)
-	end
-
-	@ExecSpace("ClientOnly")
-	method void Silence(ButtonComponent button, any handler)
-		if button ~= nil and button.Entity ~= nil and handler ~= nil then
-			button.Entity:DisconnectEvent(ButtonClickEvent, handler)
+		if self.PairButton ~= nil and self.PairButton.Entity ~= nil and self.PairHandler ~= nil then
+			self.PairButton.Entity:DisconnectEvent(ButtonClickEvent, self.PairHandler)
+		end
+		if self.GoalButton ~= nil and self.GoalButton.Entity ~= nil and self.GoalHandler ~= nil then
+			self.GoalButton.Entity:DisconnectEvent(ButtonClickEvent, self.GoalHandler)
+		end
+		if self.AcceptButton ~= nil and self.AcceptButton.Entity ~= nil and self.AcceptHandler ~= nil then
+			self.AcceptButton.Entity:DisconnectEvent(ButtonClickEvent, self.AcceptHandler)
+		end
+		if self.DenyButton ~= nil and self.DenyButton.Entity ~= nil and self.DenyHandler ~= nil then
+			self.DenyButton.Entity:DisconnectEvent(ButtonClickEvent, self.DenyHandler)
 		end
 	end
 

@@ -41,40 +41,57 @@ script LibraryHall extends Component
 	method void OnBeginPlay()
 		self:SetEnabled(self.BoardPath, false)
 		self:WriteText(self.ResultTextPath, "도서관. 세션 기록은 비공개 그래프에 남고, 출처 문장만 사실 후보가 아닙니다.")
-		self.OpenHandler = self:Listen(self.OpenButton, self.OnOpenClick)
-		self.SearchHandler = self:Listen(self.SearchButton, self.OnSearchClick)
-		self.ReadHandler = self:Listen(self.ReadButton, self.OnReadClick)
-		self.NeighborHandler = self:Listen(self.NeighborButton, self.OnNeighborClick)
-		self.PublishSourceHandler = self:Listen(self.PublishSourceButton, self.OnPublishSourceClick)
-		self.PublishSummaryHandler = self:Listen(self.PublishSummaryButton, self.OnPublishSummaryClick)
-		self.LinkHandler = self:Listen(self.LinkButton, self.OnLinkClick)
-		self.ApproveHandler = self:Listen(self.ApproveButton, self.OnApproveClick)
+		if self.OpenButton ~= nil and self.OpenButton.Entity ~= nil then
+			self.OpenHandler = self.OpenButton.Entity:ConnectEvent(ButtonClickEvent, self.OnOpenClick)
+		end
+		if self.SearchButton ~= nil and self.SearchButton.Entity ~= nil then
+			self.SearchHandler = self.SearchButton.Entity:ConnectEvent(ButtonClickEvent, self.OnSearchClick)
+		end
+		if self.ReadButton ~= nil and self.ReadButton.Entity ~= nil then
+			self.ReadHandler = self.ReadButton.Entity:ConnectEvent(ButtonClickEvent, self.OnReadClick)
+		end
+		if self.NeighborButton ~= nil and self.NeighborButton.Entity ~= nil then
+			self.NeighborHandler = self.NeighborButton.Entity:ConnectEvent(ButtonClickEvent, self.OnNeighborClick)
+		end
+		if self.PublishSourceButton ~= nil and self.PublishSourceButton.Entity ~= nil then
+			self.PublishSourceHandler = self.PublishSourceButton.Entity:ConnectEvent(ButtonClickEvent, self.OnPublishSourceClick)
+		end
+		if self.PublishSummaryButton ~= nil and self.PublishSummaryButton.Entity ~= nil then
+			self.PublishSummaryHandler = self.PublishSummaryButton.Entity:ConnectEvent(ButtonClickEvent, self.OnPublishSummaryClick)
+		end
+		if self.LinkButton ~= nil and self.LinkButton.Entity ~= nil then
+			self.LinkHandler = self.LinkButton.Entity:ConnectEvent(ButtonClickEvent, self.OnLinkClick)
+		end
+		if self.ApproveButton ~= nil and self.ApproveButton.Entity ~= nil then
+			self.ApproveHandler = self.ApproveButton.Entity:ConnectEvent(ButtonClickEvent, self.OnApproveClick)
+		end
 	end
 
 	@ExecSpace("ClientOnly")
 	method void OnEndPlay()
-		self:Silence(self.OpenButton, self.OpenHandler)
-		self:Silence(self.SearchButton, self.SearchHandler)
-		self:Silence(self.ReadButton, self.ReadHandler)
-		self:Silence(self.NeighborButton, self.NeighborHandler)
-		self:Silence(self.PublishSourceButton, self.PublishSourceHandler)
-		self:Silence(self.PublishSummaryButton, self.PublishSummaryHandler)
-		self:Silence(self.LinkButton, self.LinkHandler)
-		self:Silence(self.ApproveButton, self.ApproveHandler)
-	end
-
-	@ExecSpace("ClientOnly")
-	method any Listen(ButtonComponent button, any handler)
-		if button == nil or button.Entity == nil then
-			return nil
+		if self.OpenButton ~= nil and self.OpenButton.Entity ~= nil and self.OpenHandler ~= nil then
+			self.OpenButton.Entity:DisconnectEvent(ButtonClickEvent, self.OpenHandler)
 		end
-		return button.Entity:ConnectEvent(ButtonClickEvent, handler)
-	end
-
-	@ExecSpace("ClientOnly")
-	method void Silence(ButtonComponent button, any handler)
-		if button ~= nil and button.Entity ~= nil and handler ~= nil then
-			button.Entity:DisconnectEvent(ButtonClickEvent, handler)
+		if self.SearchButton ~= nil and self.SearchButton.Entity ~= nil and self.SearchHandler ~= nil then
+			self.SearchButton.Entity:DisconnectEvent(ButtonClickEvent, self.SearchHandler)
+		end
+		if self.ReadButton ~= nil and self.ReadButton.Entity ~= nil and self.ReadHandler ~= nil then
+			self.ReadButton.Entity:DisconnectEvent(ButtonClickEvent, self.ReadHandler)
+		end
+		if self.NeighborButton ~= nil and self.NeighborButton.Entity ~= nil and self.NeighborHandler ~= nil then
+			self.NeighborButton.Entity:DisconnectEvent(ButtonClickEvent, self.NeighborHandler)
+		end
+		if self.PublishSourceButton ~= nil and self.PublishSourceButton.Entity ~= nil and self.PublishSourceHandler ~= nil then
+			self.PublishSourceButton.Entity:DisconnectEvent(ButtonClickEvent, self.PublishSourceHandler)
+		end
+		if self.PublishSummaryButton ~= nil and self.PublishSummaryButton.Entity ~= nil and self.PublishSummaryHandler ~= nil then
+			self.PublishSummaryButton.Entity:DisconnectEvent(ButtonClickEvent, self.PublishSummaryHandler)
+		end
+		if self.LinkButton ~= nil and self.LinkButton.Entity ~= nil and self.LinkHandler ~= nil then
+			self.LinkButton.Entity:DisconnectEvent(ButtonClickEvent, self.LinkHandler)
+		end
+		if self.ApproveButton ~= nil and self.ApproveButton.Entity ~= nil and self.ApproveHandler ~= nil then
+			self.ApproveButton.Entity:DisconnectEvent(ButtonClickEvent, self.ApproveHandler)
 		end
 	end
 
