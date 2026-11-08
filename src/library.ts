@@ -543,7 +543,7 @@ export class Library {
     return this.node(nodeId).revision;
   }
 
-  retainSession(input: { sessionId: string; taskId?: string; title: string; outcome: string; shelf?: Shelf; villageId?: string }): { node: KnowledgeNode | null; edges: KnowledgeEdge[]; reason: 'created' | 'duplicate' | 'tombstone' | 'limit' | 'empty' } {
+  retainSession(input: { sessionId: string; taskId?: string; title: string; outcome: string; shelf?: Shelf; villageId?: string }): { node: KnowledgeNode | null; edges: KnowledgeEdge[]; reason: 'created' | 'revised' | 'duplicate' | 'tombstone' | 'limit' | 'empty' } {
     const villageId = this.requireVillage(input.villageId);
     if (!this.access.hasSession(input.sessionId)) throw new LibraryError('not_found', '이 마을에 없는 세션입니다.');
     const title = redactSecrets(cleanText(input.title, TITLE_LIMIT, '제목')).text;
@@ -562,6 +562,20 @@ export class Library {
     }
     const existing = this.data.nodes.find((item) => item.villageId === villageId && item.contentHash === contentHash);
     if (existing) return { node: existing, edges: [], reason: 'duplicate' };
+    const topic = this.data.nodes.find((item) => item.villageId === villageId && item.sessionId === input.sessionId && item.kind === 'summary' && normalize(item.title) === normalize(title));
+    if (topic) {
+      if (topic.body === body) return { node: topic, edges: [], reason: 'duplicate' };
+      if (topic.revisions.length >= REVISION_LIMIT) throw new LibraryError('conflict', '수정 기록이 한도에 닿았습니다. 이전 기록은 지우지 않습니다.');
+      const revisedAt = this.clock.now();
+      topic.body = body;
+      topic.revision += 1;
+      topic.updatedAt = revisedAt;
+      topic.contentHash = contentHash;
+      topic.redacted = topic.redacted || body.includes('[가림]') || title.includes('[가림]');
+      if (input.taskId) topic.taskId = input.taskId;
+      topic.revisions.push({ revision: topic.revision, title, body, authorRole: 'session', authorId: input.sessionId, ts: revisedAt });
+      return { node: topic, edges: [], reason: 'revised' };
+    }
     const owned = this.data.nodes.filter((item) => item.villageId === villageId && item.sessionId === input.sessionId).length;
     if (owned >= SESSION_NODE_LIMIT) return { node: null, edges: [], reason: 'limit' };
     const now = this.clock.now();

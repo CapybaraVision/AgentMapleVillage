@@ -20,6 +20,7 @@ import { fingerprint } from './json.js';
 import { readJson, writeJsonAtomic } from './persist.js';
 import type { SessionDriver, TurnResult } from './claude-driver.js';
 import { emptyLibrary, Library, LibraryError, migrateLibrary, type KnowledgeEdge, type KnowledgeNode, type LibraryPanel, type LibraryState } from './library.js';
+import { LibraryDatabase, openLibraryDatabase } from './library-db.js';
 
 export interface Clock {
   now(): number;
@@ -201,11 +202,17 @@ export class Office {
     private backend: WorkerBackend,
     private clock: Clock,
     private file?: string,
+    private libraryDb?: LibraryDatabase,
   ) {}
 
   static create(opts: { backend: WorkerBackend; clock?: Clock; file?: string; villageId?: string }): Office {
     const clock = opts.clock ?? systemClock;
     const office = new Office(emptyState(opts.backend.id, clock.now(), opts.villageId ?? ''), opts.backend, clock, opts.file);
+    if (opts.file) {
+      const opened = openLibraryDatabase(opts.file, office.state.library, office.state.villageId);
+      office.libraryDb = opened.db;
+      office.state.library = opened.library;
+    }
     if (opts.villageId) office.bindVillage(opts.villageId);
     office.save();
     return office;
@@ -219,8 +226,10 @@ export class Office {
     const loose = saved as OfficeState & { library?: LibraryState; villageId?: string };
     if (!loose.villageId) loose.villageId = '';
     loose.library = migrateLibrary(loose.library, loose.villageId);
+    const opened = openLibraryDatabase(opts.file, loose.library, loose.villageId);
+    loose.library = opened.library;
     loose.backend = opts.backend.id;
-    return new Office(loose, opts.backend, clock, opts.file);
+    return new Office(loose, opts.backend, clock, opts.file, opened.db);
   }
 
   bindVillage(villageId: string): void {
@@ -242,6 +251,7 @@ export class Office {
 
   save(): void {
     if (!this.file) return;
+    this.libraryDb?.write(this.state.library);
     writeJsonAtomic(this.file, this.state);
   }
 

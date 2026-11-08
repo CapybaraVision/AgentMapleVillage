@@ -38,6 +38,8 @@ node tools/deploy-msw-overlay.mjs C:\path\to\the\exported\LocalWorkspace
 
 요구가 바뀌었습니다. 끝난 세션의 짧은 작업 기록은 그 마을 저장소에 그래프로 남습니다. 재시작 후에도 `kn_` id가 같습니다. 세션이 만든 연결은 `proposed`이고 사실이 아닙니다. 출처 문장은 여전히 명시적으로 올릴 때만 생깁니다. 지운 기록은 같은 내용이 다시 자동으로 들어오지 않습니다. 비밀 문자열 걸러내기는 완전하지 않습니다. 보이는 패턴만 `[가림]`으로 바꿉니다.
 
+지식 그래프의 기준 저장소는 프로필 옆 `library.sqlite`입니다. Node에 들어 있는 SQLite를 쓰고, 클라우드 DB나 추가 패키지는 없습니다. 예전 `state.json` 그래프는 처음 열 때 그 파일로 옮기고, 옮기기 전 내용을 `library.sqlite.json-backup`에 남깁니다. 같은 제목의 다음 작업은 새 노드가 아니라 같은 `kn_`의 수정 기록입니다. 책은 그 노드를 가리키는 세계 오브젝트이고 NPC가 아닙니다. 안내원이 질문과 안내를 맡습니다. 릴레이는 SQL을 받지 않습니다. 메이플 쪽 갱신은 기존 조회 명령을 정해진 횟수 안에서 다시 부르는 방식입니다. 연결이 끊기면 기록은 파일에 남고, 화면은 끊긴 상태를 유지합니다.
+
 버튼이 기본 채팅만 연 원인은 아직 확정하지 않았습니다. 보이는 버튼과 입력을 받는 버튼은 다를 수 있습니다. 지금 스크립트는 버튼 UUID로 `ConnectEvent(ButtonClickEvent)`를 걸고, 핸들러는 ClientOnly입니다. UI 갱신은 서버에서 `/ui`를 찾지 않고, 맵 엔티티의 ClientOnly 메서드로 넘깁니다. 맵 터치는 TouchReceiveComponent의 `[self]` TouchEvent이고 UITouchDownEvent와 바꾸지 않습니다. 이 연결은 크리에이터에서 다시 확인하지 않았습니다. 슬래시 명령은 쓰지 않습니다. 읽은 범위는 [creator-sources.md](creator-sources.md)입니다. 꾸미기 대기는 [polish-backlog.md](polish-backlog.md)입니다.
 
 게시판은 피드에 있는 목표, 질문, 시스템 문장만 보여 줍니다. 바꾼 파일이나 테스트 결과를 만들어 넣지 않습니다. NPC와 책은 공식 빌더의 기본 스프라이트입니다. 캐릭터 스킨 RUID는 확인된 목록에 없어 넣지 않았습니다.

@@ -6,6 +6,7 @@ import { Connector } from '../src/connector.js';
 import { FakeClaudeDriver } from '../src/claude-driver.js';
 import { postJson } from '../src/http-client.js';
 import { claudeBackend, Office, simBackend } from '../src/office.js';
+import { libraryBackupPath, libraryDbPath } from '../src/library-db.js';
 import { DEFAULT_FOREMAN_SESSION, DEFAULT_WORKER_SESSION } from '../src/protocol.js';
 import { presentCharacter } from '../src/presentation.js';
 import { startRelay } from '../src/relay.js';
@@ -315,5 +316,71 @@ describe('presentation scaffold', () => {
     await again.apply('answer-2', 'decision.answer', { decisionId: second!.id, option: '이대로 진행' });
     expect(again.snapshot.library.nodes.some((item) => item.kind === 'summary')).toBe(false);
     await expect(again.apply('pub', 'library.publish', { kind: 'source', title: '숨김', body: '본문', sourceLabel: '메모' })).rejects.toMatchObject({ code: 'denied' });
+  });
+
+  it('stores the graph in a local sqlite file and keeps a json backup of the old file graph', async () => {
+    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'amv-sqlite-'));
+    const file = path.join(folder, 'state.json');
+    fs.writeFileSync(file, JSON.stringify({
+      version: 1,
+      backend: 'sim',
+      characters: [],
+      goals: [],
+      tasks: [],
+      decisions: [],
+      sessions: [],
+      feed: [],
+      applied: {},
+      counters: { goal: 0, task: 0, decision: 0, feed: 0 },
+      phase: 'idle',
+      createdAt: 1,
+      villageId: 'vil_alpha',
+      library: {
+        villageId: 'vil_alpha',
+        nodes: [{
+          id: 'kn_1',
+          villageId: 'vil_alpha',
+          kind: 'source',
+          assertion: 'citation',
+          assertsFact: false,
+          title: '옛 출처',
+          body: '파일에만 있던 문장',
+          sourceLabel: '메모',
+          authorRole: 'user',
+          authorId: 'user',
+          revision: 2,
+          revisions: [{ revision: 2, title: '옛 출처', body: '파일에만 있던 문장', authorRole: 'user', authorId: 'user', ts: 1 }],
+          redacted: false,
+          contentHash: 'old',
+          createdAt: 1,
+          updatedAt: 2,
+        }],
+        edges: [],
+        counters: { node: 1, edge: 0 },
+      },
+    }));
+    const loaded = Office.load({ file, backend: simBackend() });
+    expect(fs.existsSync(libraryDbPath(file))).toBe(true);
+    expect(fs.existsSync(libraryBackupPath(file))).toBe(true);
+    expect(loaded.snapshot.library.nodes[0]).toMatchObject({ id: 'kn_1', revision: 2, sourceLabel: '메모', assertsFact: false });
+    const saved = JSON.parse(fs.readFileSync(file, 'utf8')) as { library: { nodes: unknown[] } };
+    saved.library.nodes = [];
+    fs.writeFileSync(file, JSON.stringify(saved));
+    const fromDb = Office.load({ file, backend: simBackend() });
+    expect(fromDb.snapshot.library.nodes.map((node) => node.id)).toEqual(['kn_1']);
+    const live = path.join(folder, 'live');
+    fs.mkdirSync(live);
+    const office = Office.create({ backend: simBackend(), file: path.join(live, 'state.json'), villageId: 'vil_alpha' });
+    await office.apply('goal-1', 'goal.submit', { text: '같은 주제' });
+    const first = office.snapshot.decisions[0]!.id;
+    await office.apply('answer-1', 'decision.answer', { decisionId: first, option: '이대로 진행' });
+    await office.apply('goal-2', 'goal.submit', { text: '같은 주제' });
+    const second = office.snapshot.decisions.find((item) => item.status === 'open')!.id;
+    await office.apply('answer-2', 'decision.answer', { decisionId: second, option: '거절' });
+    const work = office.snapshot.library.nodes.find((node) => node.kind === 'summary');
+    expect(work).toMatchObject({ id: 'kn_1', revision: 2, shelf: 'work', assertsFact: false });
+    expect(work?.revisions).toHaveLength(2);
+    const replay = Office.load({ file: path.join(live, 'state.json'), backend: simBackend() });
+    expect(replay.snapshot.library.nodes.find((node) => node.kind === 'summary')?.revision).toBe(2);
   });
 });
