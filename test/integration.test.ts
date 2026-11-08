@@ -97,7 +97,7 @@ describe('connector integration', () => {
       paired.worldToken,
     );
     expect(done.view.goals[0]?.status).toBe('done');
-    expect(done.view.characters.find((item) => item.sessionId === DEFAULT_WORKER_SESSION)).toMatchObject({ station: 'desk', state: 'done' });
+    expect(done.view.characters.find((item) => item.sessionId === DEFAULT_WORKER_SESSION)).toMatchObject({ station: 'home', state: 'done' });
   });
 
   it('runs the packaged sim demo without a model call', async () => {

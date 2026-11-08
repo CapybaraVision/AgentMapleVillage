@@ -641,17 +641,20 @@ export class Library {
     return node;
   }
 
-  browse(input: { query?: string; shelf?: string; kind?: string; villageId?: string }): LibraryPanel {
+  browse(input: { query?: string; shelf?: string; kind?: string; afterId?: string; villageId?: string }): LibraryPanel {
     const villageId = this.requireVillage(input.villageId);
     if (input.shelf !== undefined && input.shelf !== '' && !isShelf(input.shelf)) throw new LibraryError('bad_request', '분류는 프로젝트, 개념, 작업 기록, 출처만 됩니다.');
     if (input.kind && input.kind !== 'source' && input.kind !== 'summary') throw new LibraryError('bad_request', '검색 종류는 출처 기록 또는 세션 요약만 됩니다.');
     const query = redactSecrets(input.query ?? '').text.trim();
     if (query.length > 120) throw new LibraryError('bad_request', '검색어는 120자까지입니다.');
+    const after = input.afterId ? idNumber(input.afterId) : 0;
+    if (input.afterId && !/^kn_[1-9][0-9]{0,8}$/.test(input.afterId)) throw new LibraryError('bad_request', 'afterId는 kn_ 번호입니다.');
     const parts = query.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 8);
     const ranked = this.data.nodes
       .filter((node) => node.villageId === villageId)
       .filter((node) => !input.shelf || node.shelf === input.shelf)
       .filter((node) => !input.kind || node.kind === input.kind)
+      .filter((node) => !input.afterId || idNumber(node.id) > after)
       .filter((node) => !query || scoreNode(node, parts, query.toLowerCase()) > 0)
       .sort((a, b) => idNumber(a.id) - idNumber(b.id));
     const cards = ranked.slice(0, SEARCH_LIMIT).map((node) => toCard(node));

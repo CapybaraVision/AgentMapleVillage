@@ -383,4 +383,29 @@ describe('presentation scaffold', () => {
     const replay = Office.load({ file: path.join(live, 'state.json'), backend: simBackend() });
     expect(replay.snapshot.library.nodes.find((node) => node.kind === 'summary')?.revision).toBe(2);
   });
+
+  it('pages library.browse with an afterId cursor and does not invent a file diff', async () => {
+    const office = Office.create({ backend: simBackend(), villageId: 'vil_alpha' });
+    for (let index = 1; index <= 9; index += 1) {
+      await office.apply(`pub-${index}`, 'library.publish', {
+        explicit: true,
+        kind: 'source',
+        title: `출처 ${index}`,
+        body: `본문 ${index}`,
+        sourceLabel: '메모',
+      });
+    }
+    const first = await office.apply('browse-1', 'library.browse', {});
+    const cards = first.events.find((event) => event.type === 'library.panel')?.payload.cards as Array<{ id: string }>;
+    expect(cards).toHaveLength(8);
+    const second = await office.apply('browse-2', 'library.browse', { afterId: cards[7]!.id });
+    const rest = second.events.find((event) => event.type === 'library.panel')?.payload.cards as Array<{ id: string }>;
+    expect(rest.map((card) => card.id)).toEqual(['kn_9']);
+    await office.apply('goal-1', 'goal.submit', { text: '게시판에 올릴 작업' });
+    const decision = office.snapshot.decisions[0]!.id;
+    const answered = await office.apply('answer-1', 'decision.answer', { decisionId: decision, option: '이대로 진행' });
+    const taskLine = answered.events.find((event) => event.type === 'feed.add' && event.payload.kind === 'task');
+    expect(taskLine?.payload.text).toContain('변경 파일과 테스트 결과는 이 기록에 없습니다.');
+    expect(String(taskLine?.payload.text)).not.toContain('diff');
+  });
 });

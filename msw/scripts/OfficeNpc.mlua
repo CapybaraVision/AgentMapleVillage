@@ -9,12 +9,18 @@
 @Component
 script OfficeNpc extends Component
 	property string SessionId = "ses_worker"
-	property string Station = "desk"
-	property string ActivityText = "대기 중"
+	property string Station = "home"
+	property string ActivityText = "집에서 쉬는 중"
 	property string OwnerUserId = ""
 	property boolean CaptureOwnerOnNextEnter = false
 	property number DeskX = 0
 	property number DeskY = 0
+	property number HomeX = 0
+	property number MeetingX = 0
+	property number ApproachOffset = 1.2
+	property number FloorY = 0
+	property boolean Pace = true
+	property number PaceDir = 1
 	property boolean DeskSaved = false
 	property string SlotLabel = ""
 	property number LibraryX = 0
@@ -24,8 +30,9 @@ script OfficeNpc extends Component
 	method void OnBeginPlay()
 		if self.DeskSaved == false then
 			local pos = self.Entity.TransformComponent.WorldPosition
-			self.DeskX = pos.x
+			self.FloorY = pos.y
 			self.DeskY = pos.y
+			self.HomeX = pos.x
 			self.DeskSaved = true
 		end
 		local tick = function()
@@ -49,21 +56,30 @@ script OfficeNpc extends Component
 	method void Step(number delta)
 		-- One horizontal floor. Y stays on the desk line captured at start.
 		-- conceptY bands in the anchor manifest are not a path.
-		local targetX = self.DeskX
-		local targetY = self.DeskY
-		if self.Station == "user" and self.OwnerUserId ~= "" then
-			local userEntity = _UserService:GetUserEntityByUserId(self.OwnerUserId)
-			if userEntity ~= nil and userEntity.TransformComponent ~= nil then
-				targetX = userEntity.TransformComponent.WorldPosition.x
-			end
+		local targetX = self.HomeX
+		local targetY = self.FloorY
+		if self.Station == "desk" then
+			targetX = self.DeskX
+		elseif self.Station == "meeting" then
+			targetX = self.MeetingX
 		elseif self.Station == "library" then
 			targetX = self.LibraryX
+		elseif self.Station == "user" and self.OwnerUserId ~= "" then
+			local userEntity = _UserService:GetUserEntityByUserId(self.OwnerUserId)
+			if userEntity ~= nil and userEntity.TransformComponent ~= nil then
+				targetX = userEntity.TransformComponent.WorldPosition.x + self.ApproachOffset
+			end
+		elseif self.Station == "home" and self.Pace == true then
+			targetX = self.HomeX + (self.PaceDir * 0.35)
 		end
 		local pos = self.Entity.TransformComponent.WorldPosition
 		local dx = targetX - pos.x
 		local dy = targetY - pos.y
 		local distance = (dx * dx + dy * dy) ^ 0.5
 		if distance < 0.15 then
+			if self.Station == "home" and self.Pace == true then
+				self.PaceDir = self.PaceDir * -1
+			end
 			self.Entity.MovementComponent:Stop()
 			return
 		end

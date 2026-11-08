@@ -14,7 +14,25 @@ import { fileURLToPath } from 'node:url';
 
 const MAP_ID = 'map://AgentMapleVillage';
 const OVERLAY_ROOT = '/maps/AgentMapleVillage';
-const VILLAGE_ENTITIES = ['Desk1', 'Desk2', 'Desk3', 'Desk4', 'Desk5', 'Desk6', 'Foreman', 'Worker', 'VillageRelay', 'Guide', 'NoticeBoard', 'BookWork', 'BookSource'];
+const VILLAGE_ENTITIES = ['Desk1', 'Desk2', 'Desk3', 'Desk4', 'Desk5', 'Desk6', 'Foreman', 'Worker', 'VillageRelay', 'Guide', 'NoticeBoard', 'BookWork', 'BookSource', 'HomeForeman', 'HomeWorker', 'MeetingRoom'];
+const PLACEMENTS = {
+  Desk1: { x: -5 },
+  Desk2: { x: -3 },
+  Desk3: { x: -1 },
+  Desk4: { x: 1 },
+  Desk5: { x: 3 },
+  Desk6: { x: 5 },
+  Foreman: { x: -6.5, homeX: -6.5, deskX: -5, meetingX: -1, approachOffset: -1.2 },
+  Worker: { x: 6.5, homeX: 6.5, deskX: -3, meetingX: 1, approachOffset: 1.2 },
+  Guide: { x: 4 },
+  NoticeBoard: { x: 2.2 },
+  BookWork: { x: 4.8 },
+  BookSource: { x: 5.6 },
+  HomeForeman: { x: -6.5 },
+  HomeWorker: { x: 6.5 },
+  MeetingRoom: { x: 0 },
+};
+const FLOOR_STRIPS = JSON.parse(fs.readFileSync(new URL('../msw/floors/official-strips.json', import.meta.url), 'utf8'));
 const SCRIPT_FILES = ['VillageRelay.mlua', 'OfficeNpc.mlua', 'GoalDesk.mlua', 'LibraryHall.mlua', 'OfficeStatus.mlua', 'BookSpot.mlua', 'NoticeBoard.mlua', 'GuidePost.mlua'];
 const UI_FILES = ['AgentMapleDesk.ui', 'AgentMapleLibrary.ui'];
 const BODY_BY_MODE = {
@@ -241,12 +259,18 @@ function mergeVillageOntoMap(mapJson, overlay, targetRoot, mode) {
   let order = entities.reduce((max, entity) => Math.max(max, Number(entityJson(entity).displayOrder) || 0), 0);
   const body = BODY_BY_MODE[mode];
   const stringify = entities.some((entity) => typeof entity.jsonString === 'string');
+  const standY = ensureFloor(merged, mode, targetRoot, stringify);
+  settleSpawn(entities, standY, stringify);
   for (const source of village.ContentProto.Entities) {
     const sourceJson = entityJson(source);
     const name = sourceJson.name || String(sourceJson.path || source.path || '').split('/').pop();
     if (!VILLAGE_ENTITIES.includes(name)) continue;
     const nextPath = `${targetRoot}/${name}`;
-    if (existingPaths.has(nextPath)) continue;
+    if (existingPaths.has(nextPath)) {
+      const current = entities.find((entity) => (entityJson(entity).path || entity.path) === nextPath);
+      if (current) writeEntity(current, placeOnFloor(entityJson(current), standY), stringify);
+      continue;
+    }
     const nextJs = rewritePaths(structuredClone(sourceJson), OVERLAY_ROOT, targetRoot);
     nextJs.path = nextPath;
     nextJs.displayOrder = ++order;
@@ -255,6 +279,7 @@ function mergeVillageOntoMap(mapJson, overlay, targetRoot, mode) {
       if (!BODY_TYPES.has(component['@type']) || component['@type'] === body) return component;
       return { ...component, '@type': body };
     });
+    placeOnFloor(nextJs, standY);
     const id = crypto.randomUUID();
     if (nextJs.origin && typeof nextJs.origin === 'object') nextJs.origin.root_entity_id = id;
     entities.push({
@@ -268,6 +293,155 @@ function mergeVillageOntoMap(mapJson, overlay, targetRoot, mode) {
   fillMissingScriptProperties(entities);
   ensureNpcTouch(entities);
   return merged;
+}
+
+function ensureFloor(mapJson, mode, targetRoot, stringify) {
+  const strip = FLOOR_STRIPS.modes[String(mode)];
+  if (!strip) return 0;
+  const entities = mapJson.ContentProto.Entities;
+  let tileEntity = entities.find((entity) => entityJson(entity)['@components']?.some((component) => component['@type'] === strip.component));
+  if (!tileEntity) {
+    tileEntity = blankTileEntity(targetRoot, strip);
+    entities.push(tileEntity);
+  }
+  const asString = typeof tileEntity.jsonString === 'string';
+  const js = entityJson(tileEntity);
+  const component = (js['@components'] ?? []).find((item) => item['@type'] === strip.component);
+  if (!component) return strip.standY;
+  const field = strip.tileField;
+  const tiles = Array.isArray(component[field]) ? component[field] : [];
+  const surface = surfaceRow(tiles);
+  if (surface) return surface.y + 1;
+  if (!component.TileSetRUID) component.TileSetRUID = strip.tileSetRuid;
+  const occupied = new Set(tiles.map((tile) => `${tile.position?.x},${tile.position?.y}`));
+  for (const tile of strip.tiles) {
+    const key = `${tile.position.x},${tile.position.y}`;
+    if (occupied.has(key)) continue;
+    tiles.push(structuredClone(tile));
+  }
+  component[field] = tiles;
+  if (strip.footholds?.length) {
+    const root = entities.find((entity) => /^\/maps\/[^/]+$/.test(entityJson(entity).path || entity.path || ''));
+    const rootJs = root ? entityJson(root) : null;
+    if (root && rootJs) {
+      let foothold = (rootJs['@components'] ?? []).find((item) => item['@type'] === 'MOD.Core.FootholdComponent');
+      const layer = foothold?.FootholdsByLayer?.['1'] ?? foothold?.FootholdsByLayer?.[1];
+      if (!foothold) {
+        foothold = { '@type': 'MOD.Core.FootholdComponent', FootholdsByLayer: {}, Enable: true };
+        rootJs['@components'].push(foothold);
+      }
+      if (!Array.isArray(layer) || layer.length === 0) {
+        foothold.FootholdsByLayer = {
+          ...(foothold.FootholdsByLayer ?? {}),
+          1: strip.footholds.map((item) => ({ ...item, OwnerId: tileEntity.id })),
+        };
+        writeEntity(root, rootJs, stringify || asString);
+      }
+    }
+  }
+  writeEntity(tileEntity, js, stringify || asString);
+  return strip.standY;
+}
+
+function surfaceRow(tiles) {
+  const rows = new Map();
+  for (const tile of tiles) {
+    const x = tile?.position?.x;
+    const y = tile?.position?.y;
+    if (!Number.isInteger(x) || !Number.isInteger(y)) continue;
+    const row = rows.get(y) ?? new Set();
+    row.add(x);
+    rows.set(y, row);
+  }
+  let best = null;
+  for (const [y, xs] of rows) {
+    if (xs.size < 8) continue;
+    if (!best || y > best.y) best = { y, count: xs.size };
+  }
+  return best;
+}
+
+function blankTileEntity(targetRoot, strip) {
+  const name = strip.component === 'MOD.Core.TileMapComponent' ? 'TileMap' : 'RectTileMap';
+  const id = crypto.randomUUID();
+  return {
+    id,
+    path: `${targetRoot}/${name}`,
+    componentNames: `MOD.Core.TransformComponent,${strip.component}`,
+    jsonString: {
+      name,
+      path: `${targetRoot}/${name}`,
+      nameEditable: false,
+      enable: true,
+      visible: true,
+      localize: false,
+      displayOrder: 3,
+      pathConstraints: '///',
+      revision: 1,
+      origin: { type: 'Model', entry_id: name === 'TileMap' ? 'tilemap' : 'recttilemap', sub_entity_id: null, root_entity_id: id, replaced_model_id: null },
+      modelId: name === 'TileMap' ? 'tilemap' : 'recttilemap',
+      '@components': [
+        {
+          '@type': 'MOD.Core.TransformComponent',
+          Rotation: { x: 0, y: 0, z: 0 },
+          Position: { x: 0, y: 0, z: 1000 },
+          QuaternionRotation: { x: 0, y: 0, z: 0, w: 1 },
+          ZRotation: 0,
+          Enable: true,
+        },
+        {
+          '@type': strip.component,
+          SortingLayer: strip.sortingLayer,
+          TileSetRUID: strip.tileSetRuid,
+          Enable: true,
+          [strip.tileField]: [],
+        },
+      ],
+    },
+  };
+}
+
+function settleSpawn(entities, standY, stringify) {
+  for (const entity of entities) {
+    const js = entityJson(entity);
+    const name = js.name || String(js.path || entity.path || '').split('/').pop();
+    if (name !== 'SpawnLocation') continue;
+    const transform = (js['@components'] ?? []).find((component) => component['@type'] === 'MOD.Core.TransformComponent');
+    if (!transform?.Position || Math.abs(Number(transform.Position.y) - standY) <= 1.5) continue;
+    transform.Position.y = standY;
+    writeEntity(entity, js, stringify);
+  }
+}
+
+function placeOnFloor(js, standY) {
+  const name = js.name || String(js.path || '').split('/').pop();
+  const seat = PLACEMENTS[name];
+  if (!seat) return js;
+  const transform = (js['@components'] ?? []).find((component) => component['@type'] === 'MOD.Core.TransformComponent');
+  if (transform?.Position) {
+    transform.Position.x = seat.x;
+    transform.Position.y = standY;
+  }
+  const npc = (js['@components'] ?? []).find((component) => component['@type'] === 'script.OfficeNpc');
+  if (npc && seat.homeX !== undefined) {
+    npc.HomeX = seat.homeX;
+    npc.DeskX = seat.deskX;
+    npc.MeetingX = seat.meetingX;
+    npc.ApproachOffset = seat.approachOffset;
+    npc.FloorY = standY;
+    npc.DeskY = standY;
+    npc.DeskSaved = true;
+    npc.Station = 'home';
+    npc.Pace = true;
+    npc.ActivityText = '집에서 쉬는 중';
+  }
+  return js;
+}
+
+function writeEntity(entity, js, stringify) {
+  entity.path = js.path || entity.path;
+  entity.componentNames = (js['@components'] ?? []).map((component) => component['@type']).filter(Boolean).join(',');
+  entity.jsonString = stringify ? JSON.stringify(js) : js;
 }
 
 function ensureNpcTouch(entities) {

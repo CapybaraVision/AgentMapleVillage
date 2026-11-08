@@ -37,7 +37,7 @@ for (const name of ['VillageRelay.mlua', 'OfficeNpc.mlua', 'GoalDesk.mlua', 'Lib
 }
 
 const map = MapBuilder.fromTemplate(MapBuilder.templatePath('sideview'), 'AgentMapleVillage');
-const floorY = 0.2;
+const floorY = 0;
 const desks = [-5, -3, -1, 1, 3, 5];
 desks.forEach((x, index) => {
   map.sprite(`Desk${index + 1}`, { pos: [x, floorY, 0] });
@@ -48,7 +48,7 @@ desks.forEach((x, index) => {
 });
 
 function placeNpc(name, x, sessionId, slot) {
-  map.sprite(name, { pos: [x, floorY + 0.8, 0] });
+  map.sprite(name, { pos: [x, floorY, 0] });
   map.upsertComponent(name, 'MOD.Core.NameTagComponent', { Enable: true, Name: name === 'Foreman' ? '감독관' : '작업자' });
   map.upsertComponent(name, 'MOD.Core.ChatBalloonComponent', { Enable: true });
   map.upsertComponent(name, 'MOD.Core.MovementComponent', { Enable: true });
@@ -57,20 +57,31 @@ function placeNpc(name, x, sessionId, slot) {
     Enable: true,
     SessionId: sessionId,
     SlotLabel: slot,
-    Station: 'desk',
-    ActivityText: '대기 중',
     OwnerUserId: '',
     CaptureOwnerOnNextEnter: false,
-    DeskX: x,
-    DeskY: floorY + 0.8,
+    DeskX: name === 'Foreman' ? -5 : -3,
+    DeskY: floorY,
+    HomeX: name === 'Foreman' ? -6.5 : 6.5,
+    MeetingX: name === 'Foreman' ? -1 : 1,
+    ApproachOffset: name === 'Foreman' ? -1.2 : 1.2,
+    FloorY: floorY,
+    Pace: true,
+    Station: 'home',
+    ActivityText: '집에서 쉬는 중',
     DeskSaved: true,
-    LibraryX: 6,
+    LibraryX: 4,
     MoveSpeed: 2.5,
   });
 }
 
-placeNpc('Foreman', desks[0], 'ses_foreman', 'S01');
-placeNpc('Worker', desks[1], 'ses_worker', 'S02');
+placeNpc('Foreman', -6.5, 'ses_foreman', 'S01');
+placeNpc('Worker', 6.5, 'ses_worker', 'S02');
+map.sprite('HomeForeman', { pos: [-6.5, floorY, 0] });
+map.upsertComponent('HomeForeman', 'MOD.Core.NameTagComponent', { Enable: true, Name: '감독관 집' });
+map.sprite('HomeWorker', { pos: [6.5, floorY, 0] });
+map.upsertComponent('HomeWorker', 'MOD.Core.NameTagComponent', { Enable: true, Name: '작업자 집' });
+map.sprite('MeetingRoom', { pos: [0, floorY, 0] });
+map.upsertComponent('MeetingRoom', 'MOD.Core.NameTagComponent', { Enable: true, Name: '회의' });
 for (const name of ['Foreman', 'Worker']) {
   map.upsertComponent(name, 'MOD.Core.TouchReceiveComponent', { Enable: true });
   map.upsertComponent(name, 'script.OfficeStatus', {
@@ -78,20 +89,20 @@ for (const name of ['Foreman', 'Worker']) {
     StatusLine: '릴레이에 붙어 있지 않습니다. 진행 중으로 표시하지 않습니다.',
   });
 }
-map.sprite('Guide', { pos: [0, floorY + 0.8, 0] });
+map.sprite('Guide', { pos: [4, floorY, 0] });
 map.upsertComponent('Guide', 'MOD.Core.NameTagComponent', { Enable: true, Name: '안내' });
 map.upsertComponent('Guide', 'MOD.Core.ChatBalloonComponent', { Enable: true });
 map.upsertComponent('Guide', 'script.GuidePost', { Enable: true });
-map.sprite('NoticeBoard', { pos: [2.2, floorY + 0.6, 0] });
+map.sprite('NoticeBoard', { pos: [2.2, floorY, 0] });
 map.upsertComponent('NoticeBoard', 'MOD.Core.NameTagComponent', { Enable: true, Name: '게시판' });
 map.upsertComponent('NoticeBoard', 'MOD.Core.ChatBalloonComponent', { Enable: true });
 map.upsertComponent('NoticeBoard', 'MOD.Core.TouchReceiveComponent', { Enable: true });
 map.upsertComponent('NoticeBoard', 'script.NoticeBoard', { Enable: true });
 for (const book of [
-  ['BookWork', 4, '빈 작업 책', 'work'],
-  ['BookSource', 5.4, '빈 출처 책', 'source'],
+  ['BookWork', 4.8, '빈 작업 책', 'work'],
+  ['BookSource', 5.6, '빈 출처 책', 'source'],
 ]) {
-  map.sprite(book[0], { pos: [book[1], floorY + 0.8, 0] });
+  map.sprite(book[0], { pos: [book[1], floorY, 0] });
   map.upsertComponent(book[0], 'MOD.Core.NameTagComponent', { Enable: true, Name: book[2] });
   map.upsertComponent(book[0], 'MOD.Core.ChatBalloonComponent', { Enable: true });
   map.upsertComponent(book[0], 'MOD.Core.TouchReceiveComponent', { Enable: true });

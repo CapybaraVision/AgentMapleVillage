@@ -1,7 +1,7 @@
 {
   "Id": "",
   "GameId": "",
-  "EntryKey": "ui://d83f131e-35fa-4286-8db0-5f85d58f0a43",
+  "EntryKey": "ui://ae51f190-3030-4a4e-9d5f-1d6f3bdd52dd",
   "ContentType": "x-mod/ui",
   "Content": "",
   "Usage": 0,
@@ -14,7 +14,7 @@
     "Use": "Binary",
     "Entities": [
       {
-        "id": "d83f131e-35fa-4286-8db0-5f85d58f0a43",
+        "id": "ae51f190-3030-4a4e-9d5f-1d6f3bdd52dd",
         "path": "/ui/AgentMapleDesk",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.UIGroupComponent,MOD.Core.CanvasGroupComponent",
         "jsonString": {
@@ -113,7 +113,7 @@
         }
       },
       {
-        "id": "878f154f-ac5c-4ca6-9065-ae867c631fd0",
+        "id": "8c379ada-2063-4dc1-88ab-e5fed325cca7",
         "path": "/ui/AgentMapleDesk/OpenButton",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.ButtonComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.UITouchReceiveComponent",
         "jsonString": {
@@ -356,7 +356,7 @@
         }
       },
       {
-        "id": "581967af-1974-445e-97b5-b7a59f037e82",
+        "id": "74b96a22-252c-40d0-9de9-f968517949aa",
         "path": "/ui/AgentMapleDesk/Board",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent",
         "jsonString": {
@@ -501,7 +501,7 @@
         }
       },
       {
-        "id": "2196d881-d2dd-4fe7-a575-704e747bbbeb",
+        "id": "6539ff2e-55b6-4730-bebc-fa6574d72997",
         "path": "/ui/AgentMapleDesk/Board/Title",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent",
         "jsonString": {
@@ -690,7 +690,7 @@
         }
       },
       {
-        "id": "350ccf96-6bb4-462d-8aa8-d9221946eb79",
+        "id": "7336aee0-6ff6-4f5b-8a3c-95256b3c543a",
         "path": "/ui/AgentMapleDesk/Board/StatusText",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent",
         "jsonString": {
@@ -879,7 +879,7 @@
         }
       },
       {
-        "id": "098ab9ad-9fbf-4ab0-8d48-38cae65135c7",
+        "id": "326aa037-b99d-4935-b893-51d450def0ca",
         "path": "/ui/AgentMapleDesk/Board/QuestionText",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent",
         "jsonString": {
@@ -1068,7 +1068,7 @@
         }
       },
       {
-        "id": "1d8ada41-d39f-4013-be1b-5f4b345c7279",
+        "id": "8f0e07e5-e439-43bb-b2c9-8238a8061d17",
         "path": "/ui/AgentMapleDesk/Board/ResultText",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent",
         "jsonString": {
@@ -1257,7 +1257,7 @@
         }
       },
       {
-        "id": "7570acc3-357b-42bf-bdbf-6b026fbf7bfa",
+        "id": "6486891d-e431-4da7-b71e-1adf1d3de329",
         "path": "/ui/AgentMapleDesk/Board/PairInput",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.TextGUIRendererInputComponent",
         "jsonString": {
@@ -1468,7 +1468,7 @@
         }
       },
       {
-        "id": "9ada6ad4-d2a9-438d-b35f-e9d69aba4fe2",
+        "id": "23979b01-aef0-4866-ba2b-b21121b0e5b9",
         "path": "/ui/AgentMapleDesk/Board/PairButton",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.ButtonComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.UITouchReceiveComponent",
         "jsonString": {
@@ -1711,7 +1711,7 @@
         }
       },
       {
-        "id": "b2443fcb-d822-40e1-8541-468541d54b2e",
+        "id": "34b340d8-305e-431e-b2ed-940cd333b479",
         "path": "/ui/AgentMapleDesk/Board/GoalInput",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.TextGUIRendererInputComponent",
         "jsonString": {
@@ -1922,7 +1922,7 @@
         }
       },
       {
-        "id": "060e9c63-fe5a-4bb4-a15c-daba72b0dfbc",
+        "id": "818878eb-2212-4886-9717-5c1051f149bb",
         "path": "/ui/AgentMapleDesk/Board/GoalButton",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.ButtonComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.UITouchReceiveComponent",
         "jsonString": {
@@ -2165,7 +2165,7 @@
         }
       },
       {
-        "id": "1c6d4633-175d-4cce-a136-6c6cfda38ebb",
+        "id": "d9a346f4-d39e-40a4-bdd2-f6a272ca52ac",
         "path": "/ui/AgentMapleDesk/Board/AcceptButton",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.ButtonComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.UITouchReceiveComponent",
         "jsonString": {
@@ -2408,7 +2408,7 @@
         }
       },
       {
-        "id": "920883d2-eef3-4b41-a605-346acd8d95c5",
+        "id": "e3f38642-26d6-4f67-bd17-7fb131929ffe",
         "path": "/ui/AgentMapleDesk/Board/DenyButton",
         "componentNames": "MOD.Core.UITransformComponent,MOD.Core.SpriteGUIRendererComponent,MOD.Core.ButtonComponent,MOD.Core.TextGUIRendererComponent,MOD.Core.UITouchReceiveComponent",
         "jsonString": {
@@ -2651,7 +2651,7 @@
         }
       },
       {
-        "id": "f8a12095-8969-41b8-b6ff-ee41d9f6118e",
+        "id": "2563b10c-943f-4a4e-84fd-739fffac65cf",
         "path": "/ui/AgentMapleDesk/GoalDesk",
         "componentNames": "MOD.Core.UITransformComponent,script.GoalDesk",
         "jsonString": {

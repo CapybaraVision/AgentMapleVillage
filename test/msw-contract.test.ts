@@ -28,7 +28,10 @@ describe('msw script contract', () => {
     expect(relay).toContain('/commands');
     expect(relay).toContain('/pair');
     expect(npc).toContain('Station == "user"');
-    expect(npc).toContain('targetY = self.DeskY');
+    expect(npc).toContain('Station == "meeting"');
+    expect(npc).toContain('self.HomeX');
+    expect(relay).toContain('meeting.invite');
+    expect(npc).toContain('targetY = self.FloorY');
     expect(relay).toContain('library.search');
     expect(hall).toContain('SubmitLibrarySearch');
     expect(hall).toContain('kn_');

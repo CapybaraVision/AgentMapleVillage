@@ -31,6 +31,7 @@ script VillageRelay extends Component
 	property boolean Busy = false
 	property number Cursor = 0
 	property number CommandCounter = 0
+	property string NoticeLines = ""
 	@ExecSpace("ServerOnly")
 	method void OnBeginPlay()
 		self.WorldToken = ""
@@ -39,6 +40,7 @@ script VillageRelay extends Component
 		self.Busy = false
 		self.Cursor = 0
 		self.CommandCounter = 0
+		self.NoticeLines = ""
 		local tick = function()
 			self:Poll()
 		end
@@ -155,7 +157,17 @@ script VillageRelay extends Component
 		local body = { afterEventSeq = self.Cursor }
 		local headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. self.WorldToken }
 		local response = _HttpService:PostAndWait(self.RelayBase .. "/state", _HttpService:JSONEncode(body), HttpContentType.ApplicationJson, headers)
+		if response == nil or response == "" then
+			self:PushStatus("공개 릴레이가 없습니다.")
+			self.Busy = false
+			return
+		end
 		local decoded = _HttpService:JSONDecode(response)
+		if decoded == nil then
+			self:PushStatus("공개 릴레이가 없습니다.")
+			self.Busy = false
+			return
+		end
 		if decoded ~= nil then
 			if decoded.mode == "snapshot" and decoded.view ~= nil then
 				self:ApplyView(decoded.view)
@@ -214,23 +226,39 @@ script VillageRelay extends Component
 
 	@ExecSpace("ServerOnly")
 	method void PaintBooks(table nodes)
-		local workId = ""
-		local workTitle = "빈 작업 책"
-		local sourceId = ""
-		local sourceTitle = "빈 출처 책"
+		local sawWork = false
+		local sawSource = false
 		for i = 1, #nodes do
 			local node = nodes[i]
-			if node ~= nil and node.kind == "summary" and workId == "" and node.id ~= nil then
-				workId = node.id
-				workTitle = node.title or workTitle
+			if node ~= nil and node.kind == "summary" then
+				sawWork = true
+			elseif node ~= nil and node.kind == "source" then
+				sawSource = true
 			end
-			if node ~= nil and node.kind == "source" and sourceId == "" and node.id ~= nil then
-				sourceId = node.id
-				sourceTitle = node.title or sourceTitle
-			end
+			self:NoteBook(node)
 		end
-		self:BindBook(self.BookWorkPath, workId, workTitle)
-		self:BindBook(self.BookSourcePath, sourceId, sourceTitle)
+		if sawWork == false then
+			self:BindBook(self.BookWorkPath, "", "빈 작업 책")
+		end
+		if sawSource == false then
+			self:BindBook(self.BookSourcePath, "", "빈 출처 책")
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void NoteBook(table node)
+		if node == nil or node.id == nil or node.kind == nil then
+			return
+		end
+		local title = node.title or "빈 책"
+		if node.revision ~= nil then
+			title = title .. " · 개정 " .. tostring(node.revision)
+		end
+		if node.kind == "summary" then
+			self:BindBook(self.BookWorkPath, node.id, title)
+		elseif node.kind == "source" then
+			self:BindBook(self.BookSourcePath, node.id, title)
+		end
 	end
 
 	@ExecSpace("ServerOnly")
@@ -248,7 +276,7 @@ script VillageRelay extends Component
 		local index = #feed
 		while index >= 1 and count < 4 do
 			local item = feed[index]
-			if item ~= nil and (item.kind == "goal" or item.kind == "decision" or item.kind == "system") and item.text ~= nil then
+			if item ~= nil and (item.kind == "goal" or item.kind == "decision" or item.kind == "system" or item.kind == "task") and item.text ~= nil then
 				local who = item.sessionId or "세션 없음"
 				lines = lines .. who .. " " .. tostring(item.text) .. "\n"
 				count = count + 1
@@ -258,6 +286,30 @@ script VillageRelay extends Component
 		if lines == "" then
 			lines = "기록된 변경이 없습니다. 파일 목록과 테스트 결과는 만들지 않습니다."
 		end
+		self.NoticeLines = lines
+		self:ShowNotice(lines)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void AppendNotice(table item)
+		if item == nil or item.text == nil then
+			return
+		end
+		if item.kind ~= "goal" and item.kind ~= "decision" and item.kind ~= "system" and item.kind ~= "task" then
+			return
+		end
+		local who = item.sessionId or "세션 없음"
+		local line = who .. " " .. tostring(item.text)
+		if self.NoticeLines == "" or self.NoticeLines == "기록된 변경이 없습니다. 파일 목록과 테스트 결과는 만들지 않습니다." then
+			self.NoticeLines = line
+		else
+			self.NoticeLines = line .. "\n" .. self.NoticeLines
+		end
+		self:ShowNotice(self.NoticeLines)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void ShowNotice(string lines)
 		local board = _EntityService:GetEntityByPath(self.NoticePath)
 		if board ~= nil and board.NoticeBoard ~= nil then
 			board.NoticeBoard:SetNotice(lines)
@@ -275,6 +327,13 @@ script VillageRelay extends Component
 			self:PushResult("목표가 끝났습니다.")
 		elseif event.type == "library.panel" and event.payload ~= nil then
 			self:PushLibrary(event.payload.text or "")
+		elseif event.type == "library.node" and event.payload ~= nil then
+			self:NoteBook(event.payload)
+		elseif event.type == "feed.add" and event.payload ~= nil then
+			self:AppendNotice(event.payload)
+		elseif event.type == "task.upsert" and event.payload ~= nil and event.payload.id ~= nil and event.payload.status ~= nil then
+			local who = event.payload.assigneeSessionId or "세션 없음"
+			self:AppendNotice({ kind = "task", sessionId = who, text = "과제 " .. tostring(event.payload.id) .. " 상태 " .. tostring(event.payload.status) .. ". 변경 파일과 테스트 결과는 이 기록에 없습니다." })
 		end
 	end
 
@@ -293,8 +352,35 @@ script VillageRelay extends Component
 			return
 		end
 		npc.OfficeNpc.SessionId = character.sessionId
-		npc.OfficeNpc.Station = character.station
-		npc.OfficeNpc.ActivityText = character.activity
+		if character.homeX ~= nil then
+			npc.OfficeNpc.HomeX = character.homeX
+		end
+		if character.deskX ~= nil then
+			npc.OfficeNpc.DeskX = character.deskX
+		end
+		if character.meetingX ~= nil then
+			npc.OfficeNpc.MeetingX = character.meetingX
+		end
+		if character.approachOffset ~= nil then
+			npc.OfficeNpc.ApproachOffset = character.approachOffset
+		end
+		if character.floorY ~= nil then
+			npc.OfficeNpc.FloorY = character.floorY
+			npc.OfficeNpc.DeskY = character.floorY
+		end
+		if self.WorldToken == "" then
+			npc.OfficeNpc.Station = "home"
+			npc.OfficeNpc.Pace = true
+			npc.OfficeNpc.ActivityText = "릴레이에 붙어 있지 않습니다"
+		else
+			npc.OfficeNpc.Station = character.station
+			npc.OfficeNpc.ActivityText = character.activity
+			if character.pace == true then
+				npc.OfficeNpc.Pace = true
+			else
+				npc.OfficeNpc.Pace = false
+			end
+		end
 		if npc.NameTagComponent ~= nil then
 			local slot = ""
 			if npc.OfficeNpc.SlotLabel ~= nil and npc.OfficeNpc.SlotLabel ~= "" then
@@ -371,6 +457,20 @@ script VillageRelay extends Component
 		self.CommandCounter = self.CommandCounter + 1
 		local commandId = "lib-" .. tostring(DateTime.UtcNow.Elapsed) .. "-" .. tostring(self.CommandCounter)
 		self:SendCommand(commandId, commandType, payload)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitMeetingInvite()
+		self.CommandCounter = self.CommandCounter + 1
+		local commandId = "mtg-" .. tostring(DateTime.UtcNow.Elapsed) .. "-" .. tostring(self.CommandCounter)
+		self:SendCommand(commandId, "meeting.invite", { sessionIds = { self.ForemanSessionId, self.WorkerSessionId } })
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitMeetingClose(string meetingId, string commandType)
+		self.CommandCounter = self.CommandCounter + 1
+		local commandId = "mtg-" .. tostring(DateTime.UtcNow.Elapsed) .. "-" .. tostring(self.CommandCounter)
+		self:SendCommand(commandId, commandType, { meetingId = meetingId })
 	end
 
 	@ExecSpace("ClientOnly")

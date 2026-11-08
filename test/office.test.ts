@@ -38,7 +38,7 @@ describe('office sim', () => {
     expect(done.result.status).toBe('done');
     expect(reloaded.snapshot.goals[0]).toMatchObject({ status: 'done', sessionId: DEFAULT_WORKER_SESSION });
     expect(reloaded.snapshot.tasks[0]?.status).toBe('done');
-    expect(reloaded.snapshot.characters.find((item) => item.sessionId === DEFAULT_WORKER_SESSION)).toMatchObject({ station: 'desk', state: 'done' });
+    expect(reloaded.snapshot.characters.find((item) => item.sessionId === DEFAULT_WORKER_SESSION)).toMatchObject({ station: 'home', state: 'done', pace: true });
 
     const again = Office.load({ file, backend: simBackend() });
     expect(again.snapshot.goals[0]?.status).toBe('done');
@@ -66,7 +66,7 @@ describe('office sim', () => {
     expect(after.goals.find((goal) => goal.sessionId === 'ses_alpha')?.status).toBe('done');
     expect(after.goals.find((goal) => goal.sessionId === 'ses_beta')?.status).toBe('active');
     expect(after.decisions.find((item) => item.sessionId === 'ses_beta')?.status).toBe('open');
-    expect(after.characters.find((item) => item.sessionId === 'ses_alpha')?.station).toBe('desk');
+    expect(after.characters.find((item) => item.sessionId === 'ses_alpha')?.station).toBe('home');
     expect(after.characters.find((item) => item.sessionId === 'ses_beta')?.station).toBe('user');
   });
 
@@ -79,6 +79,23 @@ describe('office sim', () => {
     expect(office.snapshot.goals[0]?.status).toBe('failed');
     expect(office.snapshot.tasks[0]?.status).toBe('blocked');
     await expect(office.apply('shell-1', 'shell.exec', { cmd: 'git push' })).rejects.toMatchObject({ code: 'denied' });
+  });
+
+  it('keeps a busy session at the question and returns everyone home when the meeting is cancelled', async () => {
+    const office = Office.create({ backend: simBackend() });
+    await office.apply('goal-1', 'goal.submit', { text: '회의 중에도 질문은 유지' });
+    const invited = await office.apply('meet-1', 'meeting.invite', { sessionIds: [DEFAULT_FOREMAN_SESSION, DEFAULT_WORKER_SESSION] });
+    expect(invited.result.heldSessionIds).toEqual([DEFAULT_WORKER_SESSION]);
+    expect(office.snapshot.characters.find((item) => item.sessionId === DEFAULT_WORKER_SESSION)?.station).toBe('user');
+    expect(office.snapshot.characters.find((item) => item.sessionId === DEFAULT_FOREMAN_SESSION)?.station).toBe('meeting');
+    expect(office.snapshot.decisions[0]?.status).toBe('open');
+    const accepted = await office.apply('meet-ok', 'meeting.accept', { meetingId: invited.result.meetingId });
+    expect(accepted.result.status).toBe('active');
+    expect(office.snapshot.characters.find((item) => item.sessionId === DEFAULT_WORKER_SESSION)?.station).toBe('user');
+    await office.apply('meet-no', 'meeting.cancel', { meetingId: invited.result.meetingId });
+    expect(office.snapshot.characters.find((item) => item.sessionId === DEFAULT_FOREMAN_SESSION)).toMatchObject({ station: 'home', pace: true });
+    expect(office.snapshot.characters.find((item) => item.sessionId === DEFAULT_WORKER_SESSION)?.station).toBe('user');
+    expect(office.snapshot.decisions.filter((item) => item.status === 'open')).toHaveLength(1);
   });
 });
 

@@ -20,6 +20,7 @@ import { fingerprint } from './json.js';
 import { readJson, writeJsonAtomic } from './persist.js';
 import type { SessionDriver, TurnResult } from './claude-driver.js';
 import { emptyLibrary, Library, LibraryError, migrateLibrary, type KnowledgeEdge, type KnowledgeNode, type LibraryPanel, type LibraryState } from './library.js';
+import { FLOOR_Y, seatFor } from './seats.js';
 import { LibraryDatabase, openLibraryDatabase } from './library-db.js';
 
 export interface Clock {
@@ -58,11 +59,21 @@ export interface OfficeState {
   sessions: AgentSessionRecord[];
   feed: OfficeView['feed'];
   applied: Record<string, AppliedCommand>;
-  counters: { goal: number; task: number; decision: number; feed: number };
+  counters: { goal: number; task: number; decision: number; feed: number; meeting: number };
+  meetings: MeetingRecord[];
   phase: string;
   createdAt: number;
   villageId: string;
   library: LibraryState;
+}
+
+export interface MeetingRecord {
+  id: string;
+  status: 'invited' | 'active' | 'ended' | 'cancelled';
+  sessionIds: string[];
+  heldSessionIds: string[];
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface WorkerContext {
@@ -157,8 +168,9 @@ function defaultCharacters(): Character[] {
       displayName: '감독관',
       role: 'lead',
       state: 'idle',
-      station: 'desk',
-      activity: '대기 중',
+      station: 'home',
+      activity: '집에서 쉬는 중',
+      ...seatFields(DEFAULT_FOREMAN_SESSION, 0),
     },
     {
       sessionId: DEFAULT_WORKER_SESSION,
@@ -166,10 +178,16 @@ function defaultCharacters(): Character[] {
       displayName: '작업자',
       role: 'worker',
       state: 'idle',
-      station: 'desk',
-      activity: '대기 중',
+      station: 'home',
+      activity: '집에서 쉬는 중',
+      ...seatFields(DEFAULT_WORKER_SESSION, 1),
     },
   ];
+}
+
+function seatFields(sessionId: string, index: number): Pick<Character, 'homeX' | 'deskX' | 'meetingX' | 'approachOffset' | 'floorY' | 'pace'> {
+  const seat = seatFor(sessionId, index);
+  return { ...seat, floorY: FLOOR_Y, pace: true };
 }
 
 function emptyState(backend: 'sim' | 'claude', now: number, villageId = ''): OfficeState {
@@ -183,7 +201,8 @@ function emptyState(backend: 'sim' | 'claude', now: number, villageId = ''): Off
     sessions: [],
     feed: [],
     applied: {},
-    counters: { goal: 0, task: 0, decision: 0, feed: 0 },
+    counters: { goal: 0, task: 0, decision: 0, feed: 0, meeting: 0 },
+    meetings: [],
     phase: 'idle',
     createdAt: now,
     villageId,
@@ -226,6 +245,8 @@ export class Office {
     const loose = saved as OfficeState & { library?: LibraryState; villageId?: string };
     if (!loose.villageId) loose.villageId = '';
     loose.library = migrateLibrary(loose.library, loose.villageId);
+    if (!Array.isArray(loose.meetings)) loose.meetings = [];
+    if (!loose.counters.meeting) loose.counters.meeting = 0;
     const opened = openLibraryDatabase(opts.file, loose.library, loose.villageId);
     loose.library = opened.library;
     loose.backend = opts.backend.id;
@@ -281,6 +302,7 @@ export class Office {
     if (type === 'goal.submit') return this.submitGoal(payload);
     if (type === 'decision.answer') return this.answer(payload);
     if (type.startsWith('library.')) return this.libraryCommand(type, payload);
+    if (type.startsWith('meeting.')) return this.meetingCommand(type, payload);
     throw new OfficeError('denied', `command type ${type} is not handled locally`);
   }
 
@@ -416,6 +438,7 @@ export class Office {
         ...(typeof payload.query === 'string' ? { query: payload.query } : {}),
         ...(typeof payload.shelf === 'string' ? { shelf: payload.shelf } : {}),
         ...(typeof payload.kind === 'string' ? { kind: payload.kind } : {}),
+        ...(typeof payload.afterId === 'string' ? { afterId: payload.afterId } : {}),
         ...(villageId ? { villageId } : {}),
       });
     }
@@ -426,6 +449,109 @@ export class Office {
       ...(typeof payload.status === 'string' ? { status: payload.status } : {}),
       ...(villageId ? { villageId } : {}),
     });
+  }
+
+  private meetingCommand(type: string, payload: Record<string, unknown>): ApplyResult {
+    const now = this.clock.now();
+    if (type === 'meeting.invite') {
+      const sessionIds = stringList(payload.sessionIds);
+      if (sessionIds.length < 1 || sessionIds.length > 6) throw new OfficeError('bad_request', 'meeting needs 1 to 6 sessions');
+      for (const sessionId of sessionIds) this.requireCharacter(sessionId);
+      const id = `mtg_${++this.state.counters.meeting}`;
+      const meeting: MeetingRecord = {
+        id,
+        status: 'invited',
+        sessionIds,
+        heldSessionIds: sessionIds.filter((sessionId) => this.busy(sessionId)),
+        createdAt: now,
+        updatedAt: now,
+      };
+      this.state.meetings.push(meeting);
+      const events = [
+        this.feed(now, 'system', '회의 요청입니다. 작업 중인 세션은 자리를 비우지 않습니다. 세션 실행은 멈추지 않습니다.', sessionIds[0]),
+        ...this.withSeats(sessionIds, now, []),
+      ];
+      return { result: { meetingId: id, status: meeting.status, heldSessionIds: meeting.heldSessionIds }, events };
+    }
+    const meeting = this.requireMeeting(stringField(payload, 'meetingId'));
+    if (type === 'meeting.accept') {
+      if (meeting.status === 'cancelled' || meeting.status === 'ended') throw new OfficeError('conflict', 'meeting is already closed');
+      meeting.status = 'active';
+      meeting.updatedAt = now;
+      meeting.heldSessionIds = meeting.sessionIds.filter((sessionId) => this.busy(sessionId));
+      return {
+        result: { meetingId: meeting.id, status: meeting.status, heldSessionIds: meeting.heldSessionIds },
+        events: [this.feed(now, 'system', '회의 자리를 확인했습니다. 모델 호출은 없습니다.', meeting.sessionIds[0]), ...this.withSeats(meeting.sessionIds, now, [])],
+      };
+    }
+    if (type === 'meeting.cancel' || type === 'meeting.end') {
+      if (meeting.status === 'cancelled' || meeting.status === 'ended') {
+        return { result: { meetingId: meeting.id, status: meeting.status, duplicate: true }, events: [] };
+      }
+      meeting.status = type === 'meeting.cancel' ? 'cancelled' : 'ended';
+      meeting.updatedAt = now;
+      const text = meeting.status === 'cancelled' ? '회의 요청을 취소했습니다.' : '회의가 끝났습니다. 자리로 돌아갑니다.';
+      return {
+        result: { meetingId: meeting.id, status: meeting.status },
+        events: [this.feed(now, 'system', text, meeting.sessionIds[0]), ...this.withSeats(meeting.sessionIds, now, [])],
+      };
+    }
+    throw new OfficeError('denied', `command type ${type} is not handled locally`);
+  }
+
+  private requireMeeting(meetingId: string): MeetingRecord {
+    const meeting = this.state.meetings.find((item) => item.id === meetingId);
+    if (!meeting) throw new OfficeError('not_found', 'unknown meeting');
+    return meeting;
+  }
+
+  private busy(sessionId: string): boolean {
+    if (this.state.decisions.some((item) => item.sessionId === sessionId && item.status === 'open')) return true;
+    return this.state.goals.some((item) => item.sessionId === sessionId && (item.status === 'planning' || item.status === 'active'));
+  }
+
+  private withSeats(sessionIds: string[], now: number, events: DomainEvent[]): DomainEvent[] {
+    const seen = new Set<string>();
+    for (const sessionId of sessionIds) {
+      if (seen.has(sessionId)) continue;
+      seen.add(sessionId);
+      events.push(this.settle(sessionId, now));
+    }
+    return events;
+  }
+
+  private settle(sessionId: string, now: number): DomainEvent {
+    const character = this.requireCharacter(sessionId);
+    const index = this.state.characters.findIndex((item) => item.sessionId === sessionId);
+    Object.assign(character, seatFields(sessionId, Math.max(0, index)));
+    const open = this.state.decisions.some((item) => item.sessionId === sessionId && item.status === 'open');
+    const working = this.state.goals.some((item) => item.sessionId === sessionId && (item.status === 'planning' || item.status === 'active'));
+    const meeting = this.state.meetings.find((item) => (item.status === 'invited' || item.status === 'active') && item.sessionIds.includes(sessionId));
+    if (open) {
+      character.station = 'user';
+      character.activity = '확인이 필요해 찾아가는 중';
+      character.pace = false;
+    } else if (working) {
+      character.station = 'desk';
+      character.activity = '책상에서 작업 중';
+      character.pace = false;
+    } else if (meeting) {
+      character.station = 'meeting';
+      character.activity = '회의 자리로 이동';
+      character.pace = false;
+    } else if (character.state === 'blocked') {
+      character.station = 'home';
+      character.activity = '거절되어 멈춤';
+      character.pace = false;
+    } else {
+      character.station = 'home';
+      character.activity = character.state === 'done' ? '일을 마치고 집에 있습니다' : '집에서 쉬는 중';
+      character.pace = true;
+    }
+    if (meeting) {
+      meeting.heldSessionIds = meeting.sessionIds.filter((id) => this.busy(id));
+    }
+    return this.characterEvent(character, now);
   }
 
   private bindCharacter(payload: Record<string, unknown>): ApplyResult {
@@ -463,6 +589,12 @@ export class Office {
         activity: '대기 중',
       };
       this.state.characters.push(character);
+    }
+    if (character.homeX === undefined) Object.assign(character, seatFields(sessionId, Math.max(0, this.state.characters.length - 1)));
+    if (!bySession) {
+      character.station = 'home';
+      character.activity = '집에서 쉬는 중';
+      character.pace = true;
     }
     const events = [this.characterEvent(character, now), this.feed(now, 'system', `${displayName} 세션이 고정되었습니다.`, sessionId)];
     return { result: { sessionId, mapleActorId }, events };
@@ -538,8 +670,8 @@ export class Office {
       worker.station = 'desk';
       worker.activity = '시작이 거부되었습니다';
       this.state.phase = 'blocked';
-      events.push(this.taskEvent(task, now), this.goalEvent(goal, now), this.characterEvent(worker, now), this.feed(now, 'error', started.reason, sessionId), this.statusEvent(now));
-      return { result: { goalId, taskId, denied: true }, events };
+      events.push(this.taskEvent(task, now), this.goalEvent(goal, now), this.characterEvent(worker, now), this.feed(now, 'error', started.reason, sessionId), this.taskFeed(task, sessionId, now), this.statusEvent(now));
+      return { result: { goalId, taskId, denied: true }, events: this.withSeats([sessionId, DEFAULT_FOREMAN_SESSION], now, events) };
     }
 
     goal.status = 'active';
@@ -568,9 +700,10 @@ export class Office {
       this.characterEvent(worker, now),
       this.characterEvent(lead, now),
       this.feed(now, 'decision', `${worker.displayName}이 질문을 들고 왔습니다.`, sessionId),
+      this.taskFeed(task, sessionId, now),
       this.statusEvent(now),
     );
-    return { result: { goalId, taskId, decisionId }, events };
+    return { result: { goalId, taskId, decisionId }, events: this.withSeats([sessionId, DEFAULT_FOREMAN_SESSION], now, events) };
   }
 
   private async answer(payload: Record<string, unknown>): Promise<ApplyResult> {
@@ -623,10 +756,11 @@ export class Office {
         this.goalEvent(goal, now),
         this.characterEvent(worker, now),
         this.feed(now, 'error', '작업이 거절되어 멈췄습니다.', worker.sessionId),
+        this.taskFeed(task, worker.sessionId, now),
         this.statusEvent(now),
         ...this.rememberWork(worker.sessionId, task.id, goal.text, '거절', now),
       );
-      return { result: { decisionId, goalId: goal.id, status: goal.status, denied: true }, events };
+      return { result: { decisionId, goalId: goal.id, status: goal.status, denied: true }, events: this.withSeats([decision.sessionId, DEFAULT_FOREMAN_SESSION], now, events) };
     }
 
     task.status = 'done';
@@ -651,10 +785,11 @@ export class Office {
       this.characterEvent(worker, now),
       ...(lead ? [this.characterEvent(lead, now)] : []),
       this.feed(now, 'goal', '목표가 끝났습니다.', worker.sessionId),
+      this.taskFeed(task, worker.sessionId, now),
       this.statusEvent(now),
       ...this.rememberWork(worker.sessionId, task.id, goal.text, `완료. 선택 ${decision.answer?.option ?? '없음'}`, now),
     );
-    return { result: { decisionId, goalId: goal.id, taskId: task.id, status: 'done' }, events };
+    return { result: { decisionId, goalId: goal.id, taskId: task.id, status: 'done' }, events: this.withSeats([decision.sessionId, DEFAULT_FOREMAN_SESSION], now, events) };
   }
 
   private sessionRecord(sessionKey: string): AgentSessionRecord {
@@ -699,6 +834,10 @@ export class Office {
 
   private decisionEvent(decision: Decision, ts: number): DomainEvent {
     return { eventId: '', type: 'decision.upsert', sessionId: decision.sessionId, ts, payload: { ...decision } };
+  }
+
+  private taskFeed(task: Task, sessionId: string, ts: number): DomainEvent {
+    return this.feed(ts, 'task', `과제 ${task.id} 상태 ${task.status}. 변경 파일과 테스트 결과는 이 기록에 없습니다.`, sessionId);
   }
 
   private feed(ts: number, kind: string, text: string, sessionId?: string): DomainEvent {
@@ -781,6 +920,13 @@ function stringField(payload: Record<string, unknown>, key: string): string {
   const value = payload[key];
   if (typeof value !== 'string') throw new OfficeError('bad_request', `${key} is required`);
   return value;
+}
+
+function stringList(value: unknown): string[] {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string' || !SESSION_ID_RE.test(item))) {
+    throw new OfficeError('bad_request', 'sessionIds must be session ids');
+  }
+  return [...new Set(value)];
 }
 
 function requiredString(payload: Record<string, unknown>, key: string): string {

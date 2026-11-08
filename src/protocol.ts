@@ -27,6 +27,10 @@ export const WORLD_COMMANDS = [
   'library.browse',
   'library.organize',
   'library.retract',
+  'meeting.invite',
+  'meeting.accept',
+  'meeting.cancel',
+  'meeting.end',
 ] as const;
 export type WorldCommandType = (typeof WORLD_COMMANDS)[number];
 
@@ -69,7 +73,7 @@ export type AgentState =
   | 'done'
   | 'error';
 
-export type Station = 'desk' | 'user' | 'lounge' | 'library';
+export type Station = 'home' | 'desk' | 'user' | 'meeting' | 'lounge' | 'library';
 export type Role = 'lead' | 'worker';
 export type GoalStatus = 'planning' | 'active' | 'done' | 'failed' | 'cancelled';
 export type TaskStatus = 'todo' | 'doing' | 'review' | 'done' | 'blocked' | 'cancelled';
@@ -85,6 +89,12 @@ export interface Character {
   station: Station;
   activity: string;
   taskId?: string;
+  homeX?: number;
+  deskX?: number;
+  meetingX?: number;
+  approachOffset?: number;
+  floorY?: number;
+  pace?: boolean;
 }
 
 export interface Goal {

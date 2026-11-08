@@ -17,11 +17,11 @@ script GoalDesk extends Component
 	-- Click wiring matches the official UI runtime skeleton: ConnectEvent on the button entity.
 	-- A helper method with an any parameter is not in that skeleton. Maker refresh of that form
 	-- reported LEA-3015 on this file. The chat-only click is still not diagnosed.
-	property ButtonComponent OpenButton = "878f154f-ac5c-4ca6-9065-ae867c631fd0"
-	property ButtonComponent PairButton = "9ada6ad4-d2a9-438d-b35f-e9d69aba4fe2"
-	property ButtonComponent GoalButton = "060e9c63-fe5a-4bb4-a15c-daba72b0dfbc"
-	property ButtonComponent AcceptButton = "1c6d4633-175d-4cce-a136-6c6cfda38ebb"
-	property ButtonComponent DenyButton = "920883d2-eef3-4b41-a605-346acd8d95c5"
+	property ButtonComponent OpenButton = "8c379ada-2063-4dc1-88ab-e5fed325cca7"
+	property ButtonComponent PairButton = "23979b01-aef0-4866-ba2b-b21121b0e5b9"
+	property ButtonComponent GoalButton = "818878eb-2212-4886-9717-5c1051f149bb"
+	property ButtonComponent AcceptButton = "d9a346f4-d39e-40a4-bdd2-f6a272ca52ac"
+	property ButtonComponent DenyButton = "e3f38642-26d6-4f67-bd17-7fb131929ffe"
 	property any OpenHandler = nil
 	property any PairHandler = nil
 	property any GoalHandler = nil
