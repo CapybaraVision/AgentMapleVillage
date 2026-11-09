@@ -33,6 +33,10 @@ describe('msw script contract', () => {
     expect(relay).toContain('meeting.invite');
     expect(relay).toContain('workspace.inspect');
     expect(relay).toContain('SubmitBookOpen');
+    expect(relay).toContain('OpenAnswerPanel');
+    expect(relay).toContain('SetTabs');
+    expect(fs.readFileSync(path.join(root, 'OfficeNpc.mlua'), 'utf8')).toContain('FlipX');
+    expect(fs.readFileSync(path.join(root, 'LibraryHall.mlua'), 'utf8')).toContain('OpenBoard');
     expect(relay).toContain('연결 끊김');
     expect(relay).toContain('작업 중');
     expect(fs.readFileSync(path.join(root, 'BookSpot.mlua'), 'utf8')).toContain('SubmitBookOpen');

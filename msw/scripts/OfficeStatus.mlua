@@ -5,7 +5,9 @@
 
 @Component
 script OfficeStatus extends Component
-	property string StatusLine = "릴레이에 붙어 있지 않습니다. 진행 중으로 표시하지 않습니다."
+	property string StatusLine = "연결 끊김. 진행 중으로 표시하지 않습니다."
+	property string Station = "home"
+	property string RelayPath = "/maps/AgentMapleVillage/VillageRelay"
 	property any TouchHandler = nil
 
 	@ExecSpace("ClientOnly")
@@ -17,6 +19,12 @@ script OfficeStatus extends Component
 
 	@ExecSpace("ClientOnly")
 	method void OnTouch()
+		if self.Station == "user" then
+			local relay = _EntityService:GetEntityByPath(self.RelayPath)
+			if relay ~= nil and relay.VillageRelay ~= nil then
+				relay.VillageRelay:OpenAnswerPanel()
+			end
+		end
 		if self.Entity.ChatBalloonComponent == nil then
 			return
 		end

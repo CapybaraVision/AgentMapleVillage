@@ -4,7 +4,11 @@
 
 @Component
 script NoticeBoard extends Component
-	property string NoticeText = "기록된 변경이 없습니다. 파일 목록과 테스트 결과는 만들지 않습니다."
+	property string NoticeText = "기록된 변경이 없습니다."
+	property string ChangeText = "기록된 변경이 없습니다."
+	property string TestText = "기록된 테스트 출력이 없습니다."
+	property string ReviewText = "열린 리뷰나 질문이 없습니다."
+	property string Tab = "change"
 	property any TouchHandler = nil
 
 	@ExecSpace("ClientOnly")
@@ -20,20 +24,51 @@ script NoticeBoard extends Component
 
 	@ExecSpace("ClientOnly")
 	method void OnTouch()
-		if self.Entity.ChatBalloonComponent ~= nil then
-			self.Entity.ChatBalloonComponent.Message = self.NoticeText
+		if self.Tab == "change" then
+			self.Tab = "test"
+		elseif self.Tab == "test" then
+			self.Tab = "review"
+		else
+			self.Tab = "change"
 		end
+		self:ShowTab()
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SetTabs(string changeText, string testText, string reviewText)
+		self.ChangeText = changeText
+		self.TestText = testText
+		self.ReviewText = reviewText
+		self:ShowTab()
 	end
 
 	@ExecSpace("ServerOnly")
 	method void SetNotice(string text)
+		self.ChangeText = text
 		self.NoticeText = text
-		self:Paint()
+		self:ShowTab()
+	end
+
+	method void ShowTab()
+		local title = "게시판 · 변경"
+		local body = self.ChangeText
+		if self.Tab == "test" then
+			title = "게시판 · 테스트"
+			body = self.TestText
+		elseif self.Tab == "review" then
+			title = "게시판 · 리뷰"
+			body = self.ReviewText
+		end
+		self.NoticeText = body
+		if self.Entity ~= nil and self.Entity.NameTagComponent ~= nil then
+			self.Entity.NameTagComponent.Name = title
+		end
+		if self.Entity ~= nil and self.Entity.ChatBalloonComponent ~= nil then
+			self.Entity.ChatBalloonComponent.Message = body
+		end
 	end
 
 	method void Paint()
-		if self.Entity ~= nil and self.Entity.NameTagComponent ~= nil then
-			self.Entity.NameTagComponent.Name = "게시판"
-		end
+		self:ShowTab()
 	end
 end

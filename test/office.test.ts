@@ -99,6 +99,17 @@ describe('office sim', () => {
     expect(office.snapshot.decisions.filter((item) => item.status === 'open')).toHaveLength(1);
   });
 
+  it('gathers idle sessions at the meeting anchor and keeps a supplied topic', async () => {
+    const office = Office.create({ backend: simBackend() });
+    const invited = await office.apply('meet-1', 'meeting.invite', { sessionIds: [DEFAULT_FOREMAN_SESSION, DEFAULT_WORKER_SESSION], topic: '바닥 위의 회의' });
+    expect(office.snapshot.characters.find((item) => item.sessionId === DEFAULT_FOREMAN_SESSION)?.station).toBe('meeting');
+    expect(office.snapshot.characters.find((item) => item.sessionId === DEFAULT_WORKER_SESSION)?.station).toBe('meeting');
+    const panel = invited.events.find((event) => event.type === 'meeting.panel');
+    expect(panel?.payload.gathered).toBe(true);
+    expect(String(panel?.payload.text)).toContain('바닥 위의 회의');
+    expect(String(panel?.payload.text)).toContain('감독관');
+  });
+
   it('keeps a private workspace and one approval row per session across restart', async () => {
     const folder = dir();
     const file = path.join(folder, 'state.json');

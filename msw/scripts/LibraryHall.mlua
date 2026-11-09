@@ -136,6 +136,12 @@ script LibraryHall extends Component
 	end
 
 	@ExecSpace("ClientOnly")
+	method void OpenBoard()
+		self:SetEnabled(self.BoardPath, true)
+		self:SetEnabled(self.OtherBoardPath, false)
+	end
+
+	@ExecSpace("ClientOnly")
 	method void ToggleBoard()
 		local board = _EntityService:GetEntityByPath(self.BoardPath)
 		if board == nil then

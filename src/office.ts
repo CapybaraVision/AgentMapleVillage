@@ -21,6 +21,7 @@ import { readJson, writeJsonAtomic } from './persist.js';
 import type { SessionDriver, TurnResult } from './claude-driver.js';
 import { emptyLibrary, Library, LibraryError, migrateLibrary, type KnowledgeEdge, type KnowledgeNode, type LibraryPanel, type LibraryState } from './library.js';
 import { FLOOR_Y, seatFor } from './seats.js';
+import { anchorFor, meetingGathering } from './world-loop.js';
 import { ensureSessionHome, sessionHome } from './session-home.js';
 import { inspectWorkdir } from './workspace-inspect.js';
 import { LibraryDatabase, openLibraryDatabase } from './library-db.js';
@@ -74,6 +75,7 @@ export interface MeetingRecord {
   status: 'invited' | 'active' | 'ended' | 'cancelled';
   sessionIds: string[];
   heldSessionIds: string[];
+  topic: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -252,6 +254,7 @@ export class Office {
     if (!loose.villageId) loose.villageId = '';
     loose.library = migrateLibrary(loose.library, loose.villageId);
     if (!Array.isArray(loose.meetings)) loose.meetings = [];
+    for (const meeting of loose.meetings) if (meeting.topic === undefined) meeting.topic = null;
     if (!loose.counters.meeting) loose.counters.meeting = 0;
     const opened = openLibraryDatabase(opts.file, loose.library, loose.villageId);
     loose.library = opened.library;
@@ -513,15 +516,16 @@ export class Office {
         status: 'invited',
         sessionIds,
         heldSessionIds: sessionIds.filter((sessionId) => this.busy(sessionId)),
+        topic: typeof payload.topic === 'string' && payload.topic.trim() ? payload.topic.trim().slice(0, 120) : null,
         createdAt: now,
         updatedAt: now,
       };
       this.state.meetings.push(meeting);
-      const events = [
+      const events = this.withSeats(sessionIds, now, [
         this.feed(now, 'system', '회의 요청입니다. 작업 중인 세션은 자리를 비우지 않습니다. 세션 실행은 멈추지 않습니다.', sessionIds[0]),
-        ...this.withSeats(sessionIds, now, []),
-      ];
-      return { result: { meetingId: id, status: meeting.status, heldSessionIds: meeting.heldSessionIds }, events };
+      ]);
+      events.push(this.meetingPanelEvent(meeting, now));
+      return { result: { meetingId: id, status: meeting.status, heldSessionIds: meeting.heldSessionIds, topic: meeting.topic }, events };
     }
     const meeting = this.requireMeeting(stringField(payload, 'meetingId'));
     if (type === 'meeting.accept') {
@@ -531,7 +535,7 @@ export class Office {
       meeting.heldSessionIds = meeting.sessionIds.filter((sessionId) => this.busy(sessionId));
       return {
         result: { meetingId: meeting.id, status: meeting.status, heldSessionIds: meeting.heldSessionIds },
-        events: [this.feed(now, 'system', '회의 자리를 확인했습니다. 모델 호출은 없습니다.', meeting.sessionIds[0]), ...this.withSeats(meeting.sessionIds, now, [])],
+        events: [...this.withSeats(meeting.sessionIds, now, [this.feed(now, 'system', '회의 자리를 확인했습니다. 모델 호출은 없습니다.', meeting.sessionIds[0])]), this.meetingPanelEvent(meeting, now)],
       };
     }
     if (type === 'meeting.cancel' || type === 'meeting.end') {
@@ -543,7 +547,7 @@ export class Office {
       const text = meeting.status === 'cancelled' ? '회의 요청을 취소했습니다.' : '회의가 끝났습니다. 자리로 돌아갑니다.';
       return {
         result: { meetingId: meeting.id, status: meeting.status },
-        events: [this.feed(now, 'system', text, meeting.sessionIds[0]), ...this.withSeats(meeting.sessionIds, now, [])],
+        events: [...this.withSeats(meeting.sessionIds, now, [this.feed(now, 'system', text, meeting.sessionIds[0])]), this.meetingPanelEvent(meeting, now)],
       };
     }
     throw new OfficeError('denied', `command type ${type} is not handled locally`);
@@ -570,6 +574,20 @@ export class Office {
     return events;
   }
 
+  private meetingPanelEvent(meeting: MeetingRecord, now: number): DomainEvent {
+    const closed = meeting.status === 'cancelled' || meeting.status === 'ended';
+    const gathered = meetingGathering({
+      characters: this.state.characters.map((character) => ({ sessionId: character.sessionId, displayName: character.displayName, station: character.station })),
+      topic: closed ? null : meeting.topic,
+    });
+    return {
+      eventId: '',
+      type: 'meeting.panel',
+      ts: now,
+      payload: { text: closed ? '회의가 아닙니다.' : gathered.text, gathered: !closed && gathered.gathered, executable: false },
+    };
+  }
+
   private settle(sessionId: string, now: number): DomainEvent {
     const character = this.requireCharacter(sessionId);
     const index = this.state.characters.findIndex((item) => item.sessionId === sessionId);
@@ -577,15 +595,16 @@ export class Office {
     const open = this.state.decisions.some((item) => item.sessionId === sessionId && item.status === 'open');
     const working = this.state.goals.some((item) => item.sessionId === sessionId && (item.status === 'planning' || item.status === 'active'));
     const meeting = this.state.meetings.find((item) => (item.status === 'invited' || item.status === 'active') && item.sessionIds.includes(sessionId));
-    if (open) {
+    const anchor = anchorFor({ linked: true, openQuestion: open, working, meeting: Boolean(meeting) });
+    if (anchor === 'player') {
       character.station = 'user';
       character.activity = '확인이 필요해 찾아가는 중';
       character.pace = false;
-    } else if (working) {
+    } else if (anchor === 'desk') {
       character.station = 'desk';
       character.activity = '책상에서 작업 중';
       character.pace = false;
-    } else if (meeting) {
+    } else if (anchor === 'meeting') {
       character.station = 'meeting';
       character.activity = '회의 자리로 이동';
       character.pace = false;

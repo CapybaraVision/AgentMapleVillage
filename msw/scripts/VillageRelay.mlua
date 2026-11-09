@@ -225,6 +225,12 @@ script VillageRelay extends Component
 		if view.feed ~= nil then
 			self:PaintNotice(view.feed)
 		end
+		if view.decisions ~= nil or view.feed ~= nil then
+			self:PaintBoard(view.feed, view.decisions)
+		end
+		if view.meeting ~= nil and view.meeting.text ~= nil then
+			self:PaintMeeting(view.meeting.text)
+		end
 	end
 
 	@ExecSpace("ServerOnly")
@@ -312,6 +318,73 @@ script VillageRelay extends Component
 	end
 
 	@ExecSpace("ServerOnly")
+	@ExecSpace("ServerOnly")
+	method void PaintBoard(table feed, table decisions)
+		local changeText = ""
+		local testText = ""
+		local reviewText = ""
+		if feed ~= nil then
+			for i = 1, #feed do
+				local item = feed[i]
+				if item ~= nil and item.text ~= nil and item.kind == "change" then
+					changeText = changeText .. (item.sessionId or "세션 없음") .. " " .. tostring(item.text) .. "\n"
+				elseif item ~= nil and item.text ~= nil and item.kind == "test" then
+					testText = testText .. (item.sessionId or "세션 없음") .. " " .. tostring(item.text) .. "\n"
+				end
+			end
+		end
+		if decisions ~= nil then
+			for i = 1, #decisions do
+				local decision = decisions[i]
+				if decision ~= nil and decision.status == "open" and decision.question ~= nil then
+					reviewText = reviewText .. (decision.sessionId or "세션 없음") .. " " .. tostring(decision.question) .. "\n"
+				end
+			end
+		end
+		if changeText == "" then
+			changeText = "기록된 변경이 없습니다."
+		end
+		if testText == "" then
+			testText = "기록된 테스트 출력이 없습니다."
+		end
+		if reviewText == "" then
+			reviewText = "열린 리뷰나 질문이 없습니다."
+		end
+		local board = _EntityService:GetEntityByPath(self.NoticePath)
+		if board ~= nil and board.NoticeBoard ~= nil then
+			board.NoticeBoard:SetTabs(changeText, testText, reviewText)
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void PaintMeeting(string text)
+		local room = _EntityService:GetEntityByPath("/maps/AgentMapleVillage/MeetingRoom")
+		if room ~= nil and room.NameTagComponent ~= nil then
+			room.NameTagComponent.Name = "회의"
+		end
+		if room ~= nil and room.ChatBalloonComponent ~= nil then
+			room.ChatBalloonComponent.Message = text
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void BindSearchBooks(table cards)
+		if cards[1] ~= nil and cards[1].id ~= nil then
+			self:BindBook(self.BookWorkPath, cards[1].id, cards[1].title or cards[1].id)
+		end
+		if cards[2] ~= nil and cards[2].id ~= nil then
+			self:BindBook(self.BookSourcePath, cards[2].id, cards[2].title or cards[2].id)
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OpenAnswerPanel()
+		local desk = _EntityService:GetEntityByPath(self.GoalDeskPath)
+		if desk ~= nil and desk.GoalDesk ~= nil then
+			desk.GoalDesk:OpenBoard()
+		end
+	end
+
 	method void ShowNotice(string lines)
 		local board = _EntityService:GetEntityByPath(self.NoticePath)
 		if board ~= nil and board.NoticeBoard ~= nil then
@@ -330,9 +403,14 @@ script VillageRelay extends Component
 			self:PushResult("목표가 끝났습니다.")
 		elseif event.type == "library.panel" and event.payload ~= nil then
 			self:PushLibrary(event.payload.text or "")
+			if event.payload.cards ~= nil then
+				self:BindSearchBooks(event.payload.cards)
+			end
 			if self.OpenBookId ~= "" then
 				self:PushBookDetail(self.OpenBookId, event.payload.text or "")
 			end
+		elseif event.type == "meeting.panel" and event.payload ~= nil then
+			self:PaintMeeting(event.payload.text or "회의가 아닙니다.")
 		elseif event.type == "library.node" and event.payload ~= nil then
 			self:NoteBook(event.payload)
 		elseif event.type == "feed.add" and event.payload ~= nil then
@@ -413,6 +491,7 @@ script VillageRelay extends Component
 			npc.ChatBalloonComponent.Message = character.activity
 		end
 		if npc.OfficeStatus ~= nil then
+			npc.OfficeStatus.Station = linked and (character.station or "home") or "home"
 			if linked == false then
 				npc.OfficeStatus.StatusLine = "연결 끊김. 진행 중으로 표시하지 않습니다."
 			else

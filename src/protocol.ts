@@ -59,6 +59,7 @@ export const EVENT_TYPES = [
   'library.node',
   'library.edge',
   'library.panel',
+  'meeting.panel',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -184,6 +185,7 @@ export interface OfficeView {
     edges: LibraryViewEdge[];
     panel?: { mode?: string; text?: string; notice?: string; executable: false };
   };
+  meeting?: { text: string; gathered: boolean };
 }
 
 export interface DomainEvent {
@@ -315,5 +317,9 @@ export function applyEvent(view: OfficeView, type: string, payload: Record<strin
   if (type === 'library.panel') {
     const panel = payload as { mode?: string; text?: string; notice?: string };
     view.library.panel = { ...panel, executable: false };
+    return;
+  }
+  if (type === 'meeting.panel') {
+    view.meeting = { text: typeof payload.text === 'string' ? payload.text : '', gathered: payload.gathered === true };
   }
 }

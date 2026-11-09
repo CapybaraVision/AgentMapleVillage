@@ -84,6 +84,9 @@ script OfficeNpc extends Component
 		if dx < 0 then
 			direction = -1
 		end
+		if self.Entity.SpriteRendererComponent ~= nil then
+			self.Entity.SpriteRendererComponent.FlipX = direction < 0
+		end
 		self.Entity.MovementComponent.InputSpeed = self.MoveSpeed
 		self.Entity.MovementComponent:MoveToDirection(Vector2(direction, 0), delta)
 	end

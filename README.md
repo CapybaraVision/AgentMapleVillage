@@ -25,7 +25,7 @@
 
 메이플 서버는 집 PC의 localhost에 직접 닿지 못합니다. 커넥터가 릴레이로 **나갑니다**. 릴레이에는 셸, git, 데스크톱 실행 엔드포인트가 없습니다.
 
-자세한 설명은 [docs/architecture.md](docs/architecture.md), 보안은 [docs/security.md](docs/security.md), 월드에 붙이는 방법은 [docs/msw-setup.md](docs/msw-setup.md)와 [docs/creator-assembly.md](docs/creator-assembly.md)입니다. Windows 검사 절차는 [docs/windows-validate.md](docs/windows-validate.md)입니다. 가져오기용 `.modpackage`는 만들지 않았습니다. 메이플 서버는 집 PC의 `127.0.0.1`에 닿지 않고, 공개 HTTPS 배포는 하지 않습니다.
+자세한 설명은 [docs/architecture.md](docs/architecture.md), 보안은 [docs/security.md](docs/security.md), 월드에 붙이는 방법은 [docs/msw-setup.md](docs/msw-setup.md)와 [docs/creator-assembly.md](docs/creator-assembly.md)입니다. Windows 검사 절차는 [docs/windows-validate.md](docs/windows-validate.md)입니다. 가져오기용 `.modpackage`는 만들지 않았습니다. 메이플 서버는 집 PC의 `127.0.0.1`에 닿지 않습니다. 월드의 HttpService가 집 릴레이를 부르려면 그 앞의 공개 HTTPS(포트 443)가 따로 있어야 하고, 이 저장소는 그 주소·인증서·계정을 만들지 않습니다. 릴레이 프로세스는 루프백만 엽니다.
 
 ## 로컬에서 시뮬 돌리기
 
@@ -39,7 +39,7 @@ npm run audit
 npm run sim
 ```
 
-공식 빌더로 만든 맵과 UI를 넣은 뒤 `npm test`는 55개, `npm run typecheck`는 오류 없음입니다. 이 54개는 파일 검사와 로컬 git 검사입니다. 실제 Claude 프로세스는 켜지 않습니다. `015e8a` 플레이에서는 지휘석 버튼이 패널을 열었습니다. 이동은 그 플레이에서 되지 않았고, 이번 바닥 수정도 크리에이터에서 다시 걸어 보지 않았습니다. 의존성 lockfile은 그대로입니다. 크리에이터에서 열어 보지는 않았습니다. 마을 지식은 프로필 폴더의 `library.sqlite`에 둡니다. 공개 릴레이에 SQL 명령은 없습니다.
+공식 빌더로 만든 맵과 UI를 넣은 뒤 `npm test`는 61개, `npm run typecheck`는 오류 없음입니다. 이 54개는 파일 검사와 로컬 git 검사입니다. 실제 Claude 프로세스는 켜지 않습니다. `015e8a` 플레이에서는 지휘석 버튼이 패널을 열었습니다. 이동은 그 플레이에서 되지 않았고, 이번 바닥 수정도 크리에이터에서 다시 걸어 보지 않았습니다. 의존성 lockfile은 그대로입니다. 크리에이터에서 열어 보지는 않았습니다. 마을 지식은 프로필 폴더의 `library.sqlite`에 둡니다. 공개 릴레이에 SQL 명령은 없습니다.
 
 `npm run sim`은 프로세스 안에서 릴레이와 커넥터를 띄우고, 한국어 목표 하나를 끝까지 진행합니다. 이것은 메이플 세션이 아니고 Claude 호출도 아닙니다. 유료 모델 호출은 없습니다.
 
