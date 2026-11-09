@@ -314,7 +314,7 @@ function ensureFloor(mapJson, mode, targetRoot, stringify) {
   const tiles = Array.isArray(component[field]) ? component[field] : [];
   const surface = surfaceRow(tiles);
   if (surface) return surface.y + 1;
-  if (!component.TileSetRUID) component.TileSetRUID = strip.tileSetRuid;
+  if (tilesetMissing(component.TileSetRUID)) component.TileSetRUID = structuredClone(strip.tileSetRuid);
   const occupied = new Set(tiles.map((tile) => `${tile.position?.x},${tile.position?.y}`));
   for (const tile of strip.tiles) {
     const key = `${tile.position.x},${tile.position.y}`;
@@ -342,7 +342,61 @@ function ensureFloor(mapJson, mode, targetRoot, stringify) {
     }
   }
   writeEntity(tileEntity, js, stringify || asString);
+  fillAbsentMapleMovement(mapJson, mode, stringify || asString);
+  if (mode === 0) {
+    const footholdY = footholdStandY(mapJson);
+    if (footholdY != null) return footholdY;
+  }
   return strip.standY;
+}
+
+function tilesetMissing(value) {
+  if (value == null || value === '') return true;
+  if (typeof value === 'string') return value.trim() === '';
+  if (typeof value === 'object') return String(value.DataId ?? value.dataId ?? '').trim() === '';
+  return false;
+}
+
+const MAPLE_MOVEMENT_DEFAULTS = {
+  Gravity: 1,
+  WalkAccelerationFactor: 1,
+  WalkDrag: 1,
+  AirAccelerationXFactor: 1,
+  AirDecelerationXFactor: 1,
+  FallSpeedMaxXFactor: 1,
+  FallSpeedMaxYFactor: 1,
+};
+
+function fillAbsentMapleMovement(mapJson, mode, stringify) {
+  if (mode !== 0) return;
+  const root = (mapJson.ContentProto?.Entities ?? []).find((entity) => /^\/maps\/[^/]+$/.test(entityJson(entity).path || entity.path || ''));
+  if (!root) return;
+  const js = entityJson(root);
+  const mapComponent = (js['@components'] ?? []).find((component) => component['@type'] === 'MOD.Core.MapComponent');
+  if (!mapComponent) return;
+  let changed = false;
+  for (const [key, value] of Object.entries(MAPLE_MOVEMENT_DEFAULTS)) {
+    if (!Object.prototype.hasOwnProperty.call(mapComponent, key)) {
+      mapComponent[key] = value;
+      changed = true;
+    }
+  }
+  if (changed) writeEntity(root, js, stringify);
+}
+
+function footholdStandY(mapJson) {
+  const root = (mapJson.ContentProto?.Entities ?? []).find((entity) => /^\/maps\/[^/]+$/.test(entityJson(entity).path || entity.path || ''));
+  const foothold = root ? (entityJson(root)['@components'] ?? []).find((component) => component['@type'] === 'MOD.Core.FootholdComponent') : null;
+  const layer = foothold?.FootholdsByLayer?.['1'] ?? foothold?.FootholdsByLayer?.[1];
+  if (!Array.isArray(layer) || layer.length === 0) return null;
+  let y = null;
+  for (const item of layer) {
+    for (const point of [item?.StartPoint, item?.EndPoint]) {
+      if (typeof point?.y !== 'number') continue;
+      y = y == null ? point.y : Math.max(y, point.y);
+    }
+  }
+  return y;
 }
 
 function surfaceRow(tiles) {

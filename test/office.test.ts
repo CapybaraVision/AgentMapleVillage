@@ -127,6 +127,7 @@ describe('office sim', () => {
     const seen = await office.apply('see-1', 'workspace.inspect', { sessionId: DEFAULT_WORKER_SESSION });
     expect(String(seen.result.summary)).toContain('notes.txt');
     expect(String(seen.result.summary)).toContain('테스트 결과는 이 검사에 없습니다.');
+    expect(String(seen.result.summary)).toContain('리뷰: 없습니다.');
     expect(office.snapshot.feed.some((item) => item.kind === 'change' && item.text.includes('notes.txt'))).toBe(true);
     await expect(office.apply('see-2', 'workspace.inspect', { sessionId: DEFAULT_WORKER_SESSION, cmd: 'rm -rf /' })).rejects.toMatchObject({ code: 'denied' });
   });

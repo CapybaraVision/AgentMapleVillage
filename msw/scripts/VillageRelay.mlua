@@ -20,6 +20,7 @@ script VillageRelay extends Component
 	property string ForemanSessionId = "ses_foreman"
 	property string WorkerSessionId = "ses_worker"
 	property string NoticePath = "/maps/AgentMapleVillage/NoticeBoard"
+	property string GuidePath = "/maps/AgentMapleVillage/Guide"
 	property string BookWorkPath = "/maps/AgentMapleVillage/BookWork"
 	property string BookSourcePath = "/maps/AgentMapleVillage/BookSource"
 	-- Our relay bearer. Not the unverified HttpService.WorldToken builtin.
@@ -457,6 +458,24 @@ script VillageRelay extends Component
 		self.CommandCounter = self.CommandCounter + 1
 		local commandId = "lib-" .. tostring(DateTime.UtcNow.Elapsed) .. "-" .. tostring(self.CommandCounter)
 		self:SendCommand(commandId, commandType, payload)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitGuideQuestion()
+		if self.WorldToken == "" then
+			self:PushGuide("공개 릴레이가 없습니다. 저는 저장된 책 제목만 읽고, 답을 만들지 않습니다.")
+			return
+		end
+		self:SendLibrary("library.browse", {})
+		self:PushGuide("저장된 책 목록을 요청했습니다. 세션 기록은 사실이 아닙니다.")
+	end
+
+	@ExecSpace("ClientOnly")
+	method void PushGuide(string text)
+		local guide = _EntityService:GetEntityByPath(self.GuidePath)
+		if guide ~= nil and guide.GuidePost ~= nil then
+			guide.GuidePost:ShowLine(text)
+		end
 	end
 
 	@ExecSpace("ServerOnly")

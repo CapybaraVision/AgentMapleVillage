@@ -491,7 +491,10 @@ export class Office {
   private async noteInspect(sessionId: string, taskId: string | undefined, now: number): Promise<DomainEvent[]> {
     if (!this.file) return [this.feed(now, 'change', '세션 폴더가 없습니다. 변경 파일과 테스트 결과는 이 검사에 없습니다.', sessionId)];
     const report = await inspectWorkdir(sessionHome(path.dirname(this.file), sessionId));
-    const events: DomainEvent[] = [this.feed(now, 'change', `${sessionId} ${report.summary}`, sessionId)];
+    const review = this.state.decisions.some((item) => item.sessionId === sessionId && item.status === 'open')
+      ? '리뷰: 열린 질문이 있습니다.'
+      : '리뷰: 없습니다.';
+    const events: DomainEvent[] = [this.feed(now, 'change', `${sessionId} ${report.summary}\n${review}`, sessionId)];
     if (this.state.villageId && report.repo) {
       events.push(...this.rememberWork(sessionId, taskId ?? '', '작업 폴더 검사', report.files.length ? `변경 ${report.files.length}` : '변경 없음', now));
     }
