@@ -282,6 +282,64 @@ describe('Basic workspace deploy', () => {
     expect(fs.existsSync(path.join(workspace, 'RootDesk/MyDesk/DefaultPlayer.model'))).toBe(false);
   });
 
+  it('repairs an empty tileset and missing movement fields even when a long tile row already exists', () => {
+    const { workspace } = basicWorkspace(0, false);
+    const tiles = [];
+    for (let x = 0; x < 10; x += 1) tiles.push({ type: 0, position: { x, y: -1 }, tileIndex: 2 });
+    const footholds = [{ Id: 1, StartPoint: { x: -8.93, y: -0.04 }, EndPoint: { x: 8.03, y: -0.04 }, attribute: { walk: 1 } }];
+    const map = JSON.parse(fs.readFileSync(path.join(workspace, 'map/map01.map'), 'utf8')) as {
+      ContentProto: { Entities: Array<Record<string, unknown>> };
+    };
+    map.ContentProto.Entities[0] = {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      path: '/maps/map01',
+      componentNames: 'MOD.Core.MapComponent,MOD.Core.FootholdComponent',
+      jsonString: {
+        name: 'map01',
+        path: '/maps/map01',
+        '@components': [
+          { '@type': 'MOD.Core.MapComponent', IsInstanceMap: false, TileMapMode: 0, Enable: true, WalkDrag: 3 },
+          { '@type': 'MOD.Core.FootholdComponent', FootholdsByLayer: { 1: footholds }, Enable: true },
+        ],
+      },
+    };
+    map.ContentProto.Entities.push({
+      id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      path: '/maps/map01/TileMap',
+      componentNames: 'MOD.Core.TileMapComponent',
+      jsonString: {
+        name: 'TileMap',
+        path: '/maps/map01/TileMap',
+        '@components': [{ '@type': 'MOD.Core.TileMapComponent', TileSetRUID: { DataId: '' }, Enable: true, Tiles: tiles }],
+      },
+    });
+    fs.writeFileSync(path.join(workspace, 'map/map01.map'), JSON.stringify(map));
+    const beforeTiles = JSON.stringify(tiles);
+    const beforeFootholds = JSON.stringify(footholds);
+    expect(runDeploy(workspace).status).toBe(0);
+    const written = JSON.parse(fs.readFileSync(path.join(workspace, 'map/map01.map'), 'utf8')) as {
+      ContentProto: { Entities: Array<{ path?: string; jsonString?: { '@components'?: Array<Record<string, unknown>> } }> };
+    };
+    const root = written.ContentProto.Entities.find((entity) => entity.path === '/maps/map01')?.jsonString;
+    const mapComponent = root?.['@components']?.find((component) => component['@type'] === 'MOD.Core.MapComponent');
+    expect(mapComponent?.TileMapMode).toBe(0);
+    expect(mapComponent?.IsInstanceMap).toBe(false);
+    expect(mapComponent?.Enable).toBe(true);
+    expect(mapComponent?.WalkDrag).toBe(3);
+    for (const key of ['Gravity', 'WalkAccelerationFactor', 'AirAccelerationXFactor', 'AirDecelerationXFactor', 'FallSpeedMaxXFactor', 'FallSpeedMaxYFactor']) {
+      expect(mapComponent?.[key]).toBe(1);
+    }
+    const tile = written.ContentProto.Entities.find((entity) => entity.path === '/maps/map01/TileMap')?.jsonString?.['@components']?.find((component) => component['@type'] === 'MOD.Core.TileMapComponent');
+    expect((tile?.TileSetRUID as { DataId?: string }).DataId).toBe('9dfea3808bbd49a5877d8624df21b1c7');
+    expect(JSON.stringify(tile?.Tiles)).toBe(beforeTiles);
+    const kept = root?.['@components']?.find((component) => component['@type'] === 'MOD.Core.FootholdComponent') as { FootholdsByLayer?: { 1?: unknown } };
+    expect(JSON.stringify(kept.FootholdsByLayer?.['1'])).toBe(beforeFootholds);
+    const spawn = written.ContentProto.Entities.find((entity) => entity.path === '/maps/map01/SpawnLocation');
+    const spawnPos = spawn?.jsonString?.['@components']?.find((component) => component['@type'] === 'MOD.Core.TransformComponent') as { Position?: { x?: number; y?: number } };
+    expect(spawnPos.Position?.x).toBe(0);
+    expect(spawnPos.Position?.y).toBeCloseTo(-0.04);
+  });
+
   it('rejects a SectorConfig whose entries are not a string array before any write', () => {
     for (const entries of [1, { 'map://map01': true }, null]) {
       const { parent, workspace, mapBytes } = basicWorkspace();

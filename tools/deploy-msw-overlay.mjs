@@ -261,8 +261,10 @@ function mergeVillageOntoMap(mapJson, overlay, targetRoot, mode) {
   let order = entities.reduce((max, entity) => Math.max(max, Number(entityJson(entity).displayOrder) || 0), 0);
   const body = BODY_BY_MODE[mode];
   const stringify = entities.some((entity) => typeof entity.jsonString === 'string');
+  repairMapleMap(merged, mode, stringify);
   const standY = ensureFloor(merged, mode, targetRoot, stringify);
-  settleSpawn(entities, standY, targetRoot, stringify);
+  const footholdY = mode === 0 ? footholdStandY(merged) : null;
+  settleSpawn(entities, footholdY ?? standY, targetRoot, stringify);
   for (const source of village.ContentProto.Entities) {
     const sourceJson = entityJson(source);
     const name = sourceJson.name || String(sourceJson.path || source.path || '').split('/').pop();
@@ -312,9 +314,21 @@ function ensureFloor(mapJson, mode, targetRoot, stringify) {
   if (!component) return strip.standY;
   const field = strip.tileField;
   const tiles = Array.isArray(component[field]) ? component[field] : [];
+  let tilesetChanged = false;
+  if (tilesetMissing(component.TileSetRUID)) {
+    component.TileSetRUID = structuredClone(strip.tileSetRuid);
+    tilesetChanged = true;
+  }
+  fillAbsentMapleMovement(mapJson, mode, stringify || asString);
   const surface = surfaceRow(tiles);
-  if (surface) return surface.y + 1;
-  if (tilesetMissing(component.TileSetRUID)) component.TileSetRUID = structuredClone(strip.tileSetRuid);
+  if (surface) {
+    if (tilesetChanged) writeEntity(tileEntity, js, stringify || asString);
+    if (mode === 0) {
+      const footholdY = footholdStandY(mapJson);
+      if (footholdY != null) return footholdY;
+    }
+    return surface.y + 1;
+  }
   const occupied = new Set(tiles.map((tile) => `${tile.position?.x},${tile.position?.y}`));
   for (const tile of strip.tiles) {
     const key = `${tile.position.x},${tile.position.y}`;
@@ -348,6 +362,19 @@ function ensureFloor(mapJson, mode, targetRoot, stringify) {
     if (footholdY != null) return footholdY;
   }
   return strip.standY;
+}
+
+function repairMapleMap(mapJson, mode, stringify) {
+  if (mode !== 0) return;
+  fillAbsentMapleMovement(mapJson, mode, stringify);
+  const strip = FLOOR_STRIPS.modes['0'];
+  const tileEntity = (mapJson.ContentProto?.Entities ?? []).find((entity) => entityJson(entity)['@components']?.some((component) => component['@type'] === strip.component));
+  if (!tileEntity) return;
+  const js = entityJson(tileEntity);
+  const component = (js['@components'] ?? []).find((item) => item['@type'] === strip.component);
+  if (!component || !tilesetMissing(component.TileSetRUID)) return;
+  component.TileSetRUID = structuredClone(strip.tileSetRuid);
+  writeEntity(tileEntity, js, stringify || typeof tileEntity.jsonString === 'string');
 }
 
 function tilesetMissing(value) {
