@@ -693,7 +693,9 @@ export class Library {
     const edges = this.incident(node.id).slice(0, NEIGHBOR_LIMIT);
     const cards = [toCard(node)];
     const panel = this.panel('read', cards, edges.map(edgeView));
-    panel.text = `${panel.text}\n개정 ${node.revision}회, 사실 단정 아님`;
+    const history = node.revisions.map((item) => `개정 ${item.revision}: ${oneLine(item.title)}`).join('\n');
+    const source = node.sourceLabel ? `출처 이름: ${node.sourceLabel}` : '출처 이름: 없음';
+    panel.text = `${panel.text}\n${source}\n${history}\n사실 단정 아님`;
     return { node, panel };
   }
 

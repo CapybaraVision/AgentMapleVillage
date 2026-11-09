@@ -32,6 +32,10 @@ describe('msw script contract', () => {
     expect(npc).toContain('self.HomeX');
     expect(relay).toContain('meeting.invite');
     expect(relay).toContain('workspace.inspect');
+    expect(relay).toContain('SubmitBookOpen');
+    expect(relay).toContain('연결 끊김');
+    expect(relay).toContain('작업 중');
+    expect(fs.readFileSync(path.join(root, 'BookSpot.mlua'), 'utf8')).toContain('SubmitBookOpen');
     expect(npc).toContain('MoveToDirection');
     expect(npc).not.toContain('SetWorldPosition');
     expect(relay).toContain('library.search');

@@ -29,6 +29,7 @@ script VillageRelay extends Component
 	property string WorldToken = ""
 	property any ClockOffset = nil
 	property string OpenDecisionId = ""
+	property string OpenBookId = ""
 	property boolean Busy = false
 	property number Cursor = 0
 	property number CommandCounter = 0
@@ -38,6 +39,7 @@ script VillageRelay extends Component
 		self.WorldToken = ""
 		self.ClockOffset = nil
 		self.OpenDecisionId = ""
+		self.OpenBookId = ""
 		self.Busy = false
 		self.Cursor = 0
 		self.CommandCounter = 0
@@ -328,6 +330,9 @@ script VillageRelay extends Component
 			self:PushResult("목표가 끝났습니다.")
 		elseif event.type == "library.panel" and event.payload ~= nil then
 			self:PushLibrary(event.payload.text or "")
+			if self.OpenBookId ~= "" then
+				self:PushBookDetail(self.OpenBookId, event.payload.text or "")
+			end
 		elseif event.type == "library.node" and event.payload ~= nil then
 			self:NoteBook(event.payload)
 		elseif event.type == "feed.add" and event.payload ~= nil then
@@ -369,7 +374,22 @@ script VillageRelay extends Component
 			npc.OfficeNpc.FloorY = character.floorY
 			npc.OfficeNpc.DeskY = character.floorY
 		end
-		if self.WorldToken == "" then
+		local linked = self.WorldToken ~= ""
+		local stateLabel = "연결 끊김"
+		if linked then
+			if character.station == "desk" then
+				stateLabel = "작업 중"
+			elseif character.station == "user" then
+				stateLabel = "질문"
+			elseif character.station == "meeting" then
+				stateLabel = "회의"
+			elseif character.station == "home" then
+				stateLabel = "집"
+			else
+				stateLabel = character.station or ""
+			end
+		end
+		if linked == false then
 			npc.OfficeNpc.Station = "home"
 			npc.OfficeNpc.Pace = true
 			npc.OfficeNpc.ActivityText = "릴레이에 붙어 있지 않습니다"
@@ -387,16 +407,16 @@ script VillageRelay extends Component
 			if npc.OfficeNpc.SlotLabel ~= nil and npc.OfficeNpc.SlotLabel ~= "" then
 				slot = npc.OfficeNpc.SlotLabel .. " · "
 			end
-			npc.NameTagComponent.Name = character.displayName .. " · " .. slot .. character.activity
+			npc.NameTagComponent.Name = character.displayName .. " · " .. slot .. stateLabel
 		end
-		if npc.ChatBalloonComponent ~= nil and character.station == "user" then
+		if npc.ChatBalloonComponent ~= nil and linked and character.station == "user" then
 			npc.ChatBalloonComponent.Message = character.activity
 		end
 		if npc.OfficeStatus ~= nil then
-			if self.WorldToken == "" then
-				npc.OfficeStatus.StatusLine = "릴레이에 붙어 있지 않습니다. 진행 중으로 표시하지 않습니다."
+			if linked == false then
+				npc.OfficeStatus.StatusLine = "연결 끊김. 진행 중으로 표시하지 않습니다."
 			else
-				npc.OfficeStatus.StatusLine = character.activity or ""
+				npc.OfficeStatus.StatusLine = stateLabel .. "\n" .. (character.activity or "")
 			end
 		end
 	end
@@ -458,6 +478,30 @@ script VillageRelay extends Component
 		self.CommandCounter = self.CommandCounter + 1
 		local commandId = "lib-" .. tostring(DateTime.UtcNow.Elapsed) .. "-" .. tostring(self.CommandCounter)
 		self:SendCommand(commandId, commandType, payload)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitBookOpen(string nodeId)
+		self.OpenBookId = nodeId or ""
+		if self.WorldToken == "" or self.ClockOffset == nil then
+			self:PushBookDetail(self.OpenBookId, "공개 릴레이가 없습니다. 제목만 있고 본문과 개정 기록은 받지 못했습니다.")
+			return
+		end
+		self:SendLibrary("library.read", { nodeId = nodeId })
+	end
+
+	@ExecSpace("ServerOnly")
+	method void PushBookDetail(string nodeId, string text)
+		self:GiveBookDetail(self.BookWorkPath, nodeId, text)
+		self:GiveBookDetail(self.BookSourcePath, nodeId, text)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void GiveBookDetail(string path, string nodeId, string text)
+		local book = _EntityService:GetEntityByPath(path)
+		if book ~= nil and book.BookSpot ~= nil and book.BookSpot.NodeId == nodeId then
+			book.BookSpot:ShowDetail(text)
+		end
 	end
 
 	@ExecSpace("ServerOnly")

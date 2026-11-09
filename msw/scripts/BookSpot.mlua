@@ -8,6 +8,8 @@ script BookSpot extends Component
 	property string Shelf = "work"
 	property string NodeId = ""
 	property string TitleText = "빈 책"
+	property string DetailText = ""
+	property string RelayPath = "/maps/AgentMapleVillage/VillageRelay"
 	property any TouchHandler = nil
 
 	@ExecSpace("ClientOnly")
@@ -23,14 +25,32 @@ script BookSpot extends Component
 
 	@ExecSpace("ClientOnly")
 	method void OnTouch()
-		if self.Entity.ChatBalloonComponent == nil then
-			return
-		end
-		local line = "빈 책. 세션이 끝나면 작업 기록만 이 칸에 남습니다."
 		if self.NodeId ~= "" then
-			line = self.TitleText .. " (" .. self.NodeId .. "). 세션 기록은 출처가 아니고 사실이 아닙니다."
+			local relay = _EntityService:GetEntityByPath(self.RelayPath)
+			if relay ~= nil and relay.VillageRelay ~= nil then
+				relay.VillageRelay:SubmitBookOpen(self.NodeId)
+				return
+			end
 		end
-		self.Entity.ChatBalloonComponent.Message = line
+		self:ShowDetail(self:LocalLine())
+	end
+
+	method string LocalLine()
+		if self.DetailText ~= "" then
+			return self.DetailText
+		end
+		if self.NodeId == "" then
+			return "빈 책. 세션이 끝나면 작업 기록만 이 칸에 남습니다."
+		end
+		return self.TitleText .. " (" .. self.NodeId .. "). 본문은 릴레이가 없으면 받지 못합니다."
+	end
+
+	@ExecSpace("ServerOnly")
+	method void ShowDetail(string text)
+		self.DetailText = text
+		if self.Entity.ChatBalloonComponent ~= nil then
+			self.Entity.ChatBalloonComponent.Message = text
+		end
 	end
 
 	@ExecSpace("ServerOnly")

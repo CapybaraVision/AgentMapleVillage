@@ -68,6 +68,12 @@ describe('knowledge graph', () => {
     expect(revised.result.revision).toBe(2);
     expect(room.snapshot.library.nodes[0]?.revisions).toHaveLength(2);
     expect(room.snapshot.library.nodes[0]?.assertion).toBe('citation');
+    const opened = await room.apply('read-1', 'library.read', { nodeId: 'kn_1' });
+    const page = opened.events.find((event) => event.type === 'library.panel')?.payload.text;
+    expect(String(page)).toContain('출처 이름: 팀 메모');
+    expect(String(page)).toContain('개정 2');
+    expect(String(page)).toContain('kn_2');
+    expect(String(page)).toContain('사실 단정 아님');
   });
 
   it('dedups content, keeps identity across restart, and rejects delete or file ingest', async () => {
