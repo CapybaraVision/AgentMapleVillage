@@ -154,7 +154,7 @@ export function planDeployment(root, overlay) {
     const merged = mergeVillageOntoMap(mapJson, overlay, targetRoot, mapInfo.mode);
     changes.push({ rel: 'map/map01.map', body: `${JSON.stringify(merged, null, 2)}\n` });
     for (const [file, id, label] of ROOM_MAPS) {
-      changes.push({ rel: path.join('map', file), body: roomMap(id, label) });
+      changes.push(roomChange(root, file, id, label));
     }
     for (const name of SCRIPT_FILES) {
       const source = fs.readFileSync(path.join(overlay, 'RootDesk/MyDesk/AgentMapleVillage', name), 'utf8');
@@ -297,6 +297,7 @@ function mergeVillageOntoMap(mapJson, overlay, targetRoot, mode) {
     existingPaths.add(nextPath);
   }
   addPortals(entities, targetRoot, footholdY ?? standY, stringify);
+  repairPortals(entities);
   fillMissingScriptProperties(entities);
   ensureNpcTouch(entities);
   return merged;
@@ -326,6 +327,35 @@ function addPortals(entities, targetRoot, standY, stringify) {
   }
 }
 
+function roomChange(root, file, id, label) {
+  const rel = path.join('map', file);
+  const full = path.join(root, rel);
+  if (!fs.existsSync(full)) return { rel, body: roomMap(id, label) };
+  try {
+    const parsed = JSON.parse(fs.readFileSync(full, 'utf8'));
+    repairPortals(parsed.ContentProto?.Entities ?? []);
+    return { rel, body: `${JSON.stringify(parsed, null, 2)}\n` };
+  } catch {
+    return { rel, body: roomMap(id, label) };
+  }
+}
+
+function repairPortals(entities) {
+  for (const entity of entities) {
+    const asString = typeof entity.jsonString === 'string';
+    const js = entityJson(entity);
+    let changed = false;
+    for (const component of js['@components'] ?? []) {
+      if (component['@type'] !== 'MOD.Core.PortalComponent') continue;
+      if (component.IsLegacy !== false) {
+        component.IsLegacy = false;
+        changed = true;
+      }
+    }
+    if (changed) writeEntity(entity, js, asString);
+  }
+}
+
 function portalEntity(root, name, x, y, label) {
   const id = crypto.randomUUID();
   const entityPath = `${root}/${name}`;
@@ -341,7 +371,7 @@ function portalEntity(root, name, x, y, label) {
       '@components': [
         { '@type': 'MOD.Core.TransformComponent', Position: { x, y, z: 0 }, Enable: true },
         { '@type': 'MOD.Core.SpriteRendererComponent', SpriteRUID: VERIFIED_SPRITE_RUID, Enable: true, SortingLayer: 'Default' },
-        { '@type': 'MOD.Core.PortalComponent', Enable: true },
+        { '@type': 'MOD.Core.PortalComponent', Enable: true, IsLegacy: false },
         { '@type': 'MOD.Core.NameTagComponent', Enable: true, Name: label },
       ],
     },
@@ -697,6 +727,7 @@ function placeOnFloor(js, standY) {
     npc.Pace = false;
     npc.Holding = false;
     if (!Object.prototype.hasOwnProperty.call(npc, 'ActivityText')) npc.ActivityText = '집에서 쉬는 중';
+    npc.CaptureOwnerOnNextEnter = true;
   }
   if (name === 'Foreman' || name === 'Worker' || name === 'Guide') useDefaultAvatar(js);
   return js;

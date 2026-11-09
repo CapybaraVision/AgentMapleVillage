@@ -50,7 +50,7 @@ node tools/deploy-msw-overlay.mjs C:\path\to\the\exported\LocalWorkspace
 
 `workspace.inspect`는 그 세션 폴더에서 `git status`와 `git diff --numstat`만 실행합니다. 명령 문자열은 받지 않습니다. 게시판의 변경 줄은 그 출력입니다. 테스트 결과가 없으면 없다고 적습니다. 승인된 쓰기용 Claude 인자는 `--permission-mode default`이고 권한 우회 플래그는 없습니다. 클라우드 테스트는 프로세스를 주입합니다. 집 PC에서 실제 CLI를 켜는 프로브는 `AGENTMAPLE_RUN_CLAUDE_PROBE=1`이 있을 때만 읽기 전용으로 돕니다.
 
-책 엔티티를 누르면 `library.read`로 그 `kn_`의 본문, 개정 목록, 출처 이름, 연결된 id를 받아 말풍선과 도서관 글에 넣습니다. 릴레이가 없으면 제목만 있고 본문은 받지 못했다고 적습니다. 안내원은 답을 만들지 않고, 연결되면 저장된 목록만 요청합니다. NPC 이름표는 연결이 없으면 `연결 끊김`, 있으면 자리 값만 `작업 중`, `질문`, `회의`, `집`으로 적습니다. NPC가 유령으로 보인 것은 빌더 기본 스프라이트 `8ef238e0d0ca4bb783aca526cff35d11`입니다. 감독관, 작업자, 안내는 그 스프라이트를 끄고, 공식 `player` 모델과 같은 `AvatarRendererComponent`, `CostumeManagerComponent`, `AvatarStateAnimationComponent`만 붙입니다. 코스튬 RUID는 그 모델에도 없어서 넣지 않았습니다. 역할마다 다른 옷은 확인하지 못했습니다. 포탈은 공식 `model://portal`의 `PortalComponent`이고, 별 모양 스프라이트 RUID는 찾지 못해 같은 기본 스프라이트를 씁니다. `PortalEntityRef`의 JSON 형식은 읽은 문서에 없어서 TargetPortal은 비워 둡니다. 메이커 참조 선택으로 연결해야 실제로 이동합니다. SectorConfig는 만들지 않습니다.
+책 엔티티를 누르면 `library.read`로 그 `kn_`의 본문, 개정 목록, 출처 이름, 연결된 id를 받아 말풍선과 도서관 글에 넣습니다. 릴레이가 없으면 제목만 있고 본문은 받지 못했다고 적습니다. 안내원은 답을 만들지 않고, 연결되면 저장된 목록만 요청합니다. NPC 이름표는 연결이 없으면 `연결 끊김`, 있으면 자리 값만 `작업 중`, `질문`, `회의`, `집`으로 적습니다. NPC가 유령으로 보인 것은 빌더 기본 스프라이트 `8ef238e0d0ca4bb783aca526cff35d11`입니다. 감독관, 작업자, 안내는 그 스프라이트를 끄고, 공식 `player` 모델과 같은 `AvatarRendererComponent`, `CostumeManagerComponent`, `AvatarStateAnimationComponent`만 붙입니다. 코스튬 RUID는 그 모델에도 없어서 넣지 않았습니다. 역할마다 다른 옷은 확인하지 못했습니다. 포탈은 공식 `model://portal`의 `PortalComponent`이고, 별 모양 스프라이트 RUID는 찾지 못해 같은 기본 스프라이트를 씁니다. `PortalEntityRef`의 JSON 형식은 읽은 문서에 없어서 TargetPortal은 비워 둡니다. 포탈 컴포넌트에는 `IsLegacy=false`를 넣습니다. 메이커 참조 선택으로 연결해야 실제로 이동합니다. SectorConfig는 만들지 않습니다.
 
 가구로 새로 확인한 RUID는 없습니다. 책상과 서가는 빌더 기본 스프라이트이고, 배경은 맵에 이미 있는 Background를 바꾸지 않습니다.
 
@@ -62,7 +62,7 @@ node tools/deploy-msw-overlay.mjs C:\path\to\the\exported\LocalWorkspace
 
 게시판은 피드에 있는 목표, 질문, 시스템 문장만 보여 줍니다. 바꾼 파일이나 테스트 결과를 만들어 넣지 않습니다. NPC와 책은 공식 빌더의 기본 스프라이트입니다. 캐릭터 스킨 RUID는 확인된 목록에 없어 넣지 않았습니다.
 
-첫 크리에이터 플레이에서 서버 로그는 `cannot set WorldToken, no such field (at /maps/map01/VillageRelay)`였습니다. 공식 UI 런타임 문서는 선언하지 않은 `self` 대입이 그 오류로 메서드를 멈춘다고 적습니다. `.codeblock`은 메이커 refresh가 `.mlua`에서 만들고, 이 저장소는 그 파일을 쓰지 않습니다. 스크립트가 `OnBeginPlay`까지 실행되었으므로 빠진 것은 WorldToken 프로퍼티 선언입니다. `WorldToken`, `ClockOffset`, `OpenDecisionId`, `Busy`, `Cursor`, `CommandCounter`를 프로퍼티로 선언했습니다. `@Sync`는 붙이지 않았고, 시작할 때 토큰을 비웁니다.
+첫 크리에이터 플레이에서 서버 로그는 `cannot set WorldToken, no such field (at /maps/map01/VillageRelay)`였습니다. 공식 UI 런타임 문서는 선언하지 않은 `self` 대입이 그 오류로 메서드를 멈춘다고 적습니다. `.codeblock`은 메이커 refresh가 `.mlua`에서 만들고, 이 저장소는 그 파일을 쓰지 않습니다. 스크립트가 `OnBeginPlay`까지 실행되었으므로 빠진 것은 WorldToken 프로퍼티 선언입니다. `WorldToken`, `ClockOffset`, `OpenDecisionId`, `Busy`, `Cursor`, `CommandCounter`를 프로퍼티로 선언했습니다. `@Sync`는 붙이지 않습니다. 시작할 때 맵에 저장된 `WorldToken`은 비우지 않습니다. `ClockOffset`은 `/v1/state`의 `serverTime`으로 맞추고, 그 값이 없으면 `/v1/time`을 봅니다. 페어링은 토큰이 없을 때의 경로입니다.
 
 지휘석과 도서관 패널은 닫힌 채로 두고, `지휘석`과 `도서관` 버튼으로 하나씩 엽니다. 버튼 높이는 88이고 다음 칸과 겹치지 않게 간격을 두었습니다. 상태 문구는 `공개 릴레이가 없습니다.`입니다. 공개 HTTPS가 없으므로 `마을 연결 전`이라고 쓰지 않습니다.
 
@@ -86,7 +86,7 @@ node tools/deploy-msw-overlay.mjs C:\path\to\the\exported\LocalWorkspace
 2. 가로로 걸을 수 있는 바닥을 하나 놓습니다. 위아래 방으로는 스크립트가 걷지 않습니다.
 3. 서버 엔티티에 `msw/scripts/VillageRelay.mlua`를 스크립트 이름 `VillageRelay`로 붙입니다.
 4. NPC 둘에 `OfficeNpc.mlua`를 이름 `OfficeNpc`으로 붙입니다. 감독관 `SlotLabel`은 `S01`, 작업자는 `S02`입니다. `LibraryX`는 도서관으로 쓸 바닥의 X입니다.
-5. 질문을 받을 사람만 정하려면 `CaptureOwnerOnNextEnter`를 켠 뒤 그 사람이 한 번 입장하게 합니다. 끄면 첫 입장자를 주인으로 삼지 않습니다. `User.ProfileCode`는 릴레이 비밀번호가 아닙니다. 공식 UserService에는 월드 주인 UserId가 없습니다.
+5. `CaptureOwnerOnNextEnter` 기본값은 참입니다. 처음 입장한 플레이어가 `OwnerUserId`가 되고, 그 다음엔 스위치가 꺼집니다. 다른 사람을 주인으로 쓰려면 그 값을 비운 뒤 스위치를 다시 켜고 그 사람이 입장하게 합니다. `User.ProfileCode`는 릴레이 비밀번호가 아닙니다. 공식 UserService에는 월드 주인 UserId가 없습니다.
 6. UI 그룹에 목표 입력과 도서관 입력을 만들고 `GoalDesk.mlua`, `LibraryHall.mlua`를 붙입니다. 경로 프로퍼티를 실제 엔티티 경로로 바꿉니다.
 7. `VillageRelay.RelayBase`는 나중에 정한 HTTPS 주소입니다. `127.0.0.1`은 월드 서버가 닿지 못합니다.
 8. 페어링 후 응답의 `serverTime`(유닉스 밀리초)에서 `DateTime.UtcNow.Elapsed`를 뺀 값을 시계 오프셋으로 씁니다. `Elapsed`를 그대로 `issuedAt`으로 보내지 않습니다.

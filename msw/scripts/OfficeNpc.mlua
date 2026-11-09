@@ -12,7 +12,8 @@ script OfficeNpc extends Component
 	property string Station = "home"
 	property string ActivityText = "집에서 쉬는 중"
 	property string OwnerUserId = ""
-	property boolean CaptureOwnerOnNextEnter = false
+	property boolean CaptureOwnerOnNextEnter = true
+	property boolean MoveWarned = false
 	property number DeskX = 0
 	property number DeskY = 0
 	property number HomeX = 0
@@ -47,7 +48,7 @@ script OfficeNpc extends Component
 	@EventSender("Service", "UserService")
 	handler HandleUserEnterEvent(UserEnterEvent event)
 		-- UserService has no world-owner field. ProfileCode is not a relay credential.
-		-- The first player is not the owner unless the creator arms this switch.
+		-- The first player to enter becomes the owner, then the switch turns off.
 		if self.CaptureOwnerOnNextEnter == true and self.OwnerUserId == "" then
 			self.OwnerUserId = event.UserId
 			self.CaptureOwnerOnNextEnter = false
@@ -58,6 +59,18 @@ script OfficeNpc extends Component
 	method void Step(number delta)
 		-- Walk on the foothold with MoveToDirection, then stop. Do not pace in place.
 		-- Move again only when the target moves farther than 0.35, matching shouldHold.
+		local entity = self.Entity
+		if entity == nil or entity.TransformComponent == nil or entity.TransformComponent.WorldPosition == nil then
+			return
+		end
+		local movement = entity.MovementComponent
+		if movement == nil then
+			if self.MoveWarned ~= true then
+				self.MoveWarned = true
+				log("[AgentMaple] MovementComponent missing; step skipped")
+			end
+			return
+		end
 		local targetX = self.HomeX
 		if self.Station == "desk" then
 			targetX = self.DeskX
@@ -67,7 +80,7 @@ script OfficeNpc extends Component
 			targetX = self.LibraryX
 		elseif self.Station == "user" and self.OwnerUserId ~= "" then
 			local userEntity = _UserService:GetUserEntityByUserId(self.OwnerUserId)
-			if userEntity ~= nil and userEntity.TransformComponent ~= nil then
+			if userEntity ~= nil and userEntity.TransformComponent ~= nil and userEntity.TransformComponent.WorldPosition ~= nil then
 				targetX = userEntity.TransformComponent.WorldPosition.x + self.ApproachOffset
 			end
 		end
@@ -75,13 +88,12 @@ script OfficeNpc extends Component
 		local dx = targetX - pos.x
 		local shift = targetX - self.LastTargetX
 		if self.Holding == true and shift < 0.35 and shift > -0.35 then
-			self.Entity.MovementComponent:Stop()
 			return
 		end
 		if dx < 0.25 and dx > -0.25 then
 			self.Holding = true
 			self.LastTargetX = targetX
-			self.Entity.MovementComponent:Stop()
+			movement:Stop()
 			return
 		end
 		self.Holding = false
@@ -89,10 +101,10 @@ script OfficeNpc extends Component
 		if dx < 0 then
 			direction = -1
 		end
-		if self.Entity.SpriteRendererComponent ~= nil then
-			self.Entity.SpriteRendererComponent.FlipX = direction < 0
+		if entity.SpriteRendererComponent ~= nil then
+			entity.SpriteRendererComponent.FlipX = direction < 0
 		end
-		self.Entity.MovementComponent.InputSpeed = self.MoveSpeed
-		self.Entity.MovementComponent:MoveToDirection(Vector2(direction, 0), delta)
+		movement.InputSpeed = self.MoveSpeed
+		movement:MoveToDirection(Vector2(direction, 0), delta)
 	end
 end

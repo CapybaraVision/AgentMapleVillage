@@ -58,7 +58,7 @@ function placeNpc(name, x, sessionId, slot) {
     SessionId: sessionId,
     SlotLabel: slot,
     OwnerUserId: '',
-    CaptureOwnerOnNextEnter: false,
+    CaptureOwnerOnNextEnter: true,
     DeskX: name === 'Foreman' ? -5 : -3,
     DeskY: floorY,
     HomeX: name === 'Foreman' ? -6.5 : 6.5,

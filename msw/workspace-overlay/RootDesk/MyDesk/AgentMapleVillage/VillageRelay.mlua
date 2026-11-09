@@ -25,7 +25,7 @@ script VillageRelay extends Component
 	property string BookSourcePath = "/maps/AgentMapleVillage/BookSource"
 	-- Our relay bearer. Not the unverified HttpService.WorldToken builtin.
 	-- Declared because an undeclared self field raises "cannot set Name, no such field".
-	-- Not @Sync. OnBeginPlay clears it so a saved map does not keep the token.
+	-- Not @Sync. OnBeginPlay does not clear a token saved on the map.
 	property string WorldToken = ""
 	property any ClockOffset = nil
 	property string OpenDecisionId = ""
@@ -37,6 +37,10 @@ script VillageRelay extends Component
 	property boolean ShowDebug = false
 	property string ForemanStation = "home"
 	property string WorkerStation = "home"
+	property boolean CharactersBound = false
+	property number PollStartedAt = 0
+	property string HttpBody = ""
+	property string HttpSnippet = ""
 	@ExecSpace("ServerOnly")
 	method void OnBeginPlay()
 		self.ClockOffset = nil
@@ -46,12 +50,33 @@ script VillageRelay extends Component
 		self.Cursor = 0
 		self.CommandCounter = 0
 		self.NoticeLines = ""
+		self.CharactersBound = false
+		self.PollStartedAt = 0
+		self.ForemanStation = "home"
+		self.WorkerStation = "home"
 		self:HideEmptyAnchors()
+		self:PlaceActors()
+		local https = "false"
+		if string.sub(self.RelayBase, 1, 8) == "https://" then
+			https = "true"
+		end
+		self:Console("startup RelayBaseLen=" .. tostring(string.len(self.RelayBase)) .. " WorldTokenLen=" .. tostring(string.len(self.WorldToken)) .. " https=" .. https)
 		local tick = function()
+			if self.Busy == true then
+				local age = DateTime.UtcNow.Elapsed - self.PollStartedAt
+				if age < 35000 then
+					self:Console("poll busy age=" .. tostring(age))
+					return
+				end
+				self:Console("poll retry after stuck call")
+				self.Busy = false
+			end
 			self:Poll()
 		end
 		-- 2 seconds -> 30 requests/minute, under the documented 120/minute quota.
 		_TimerService:SetTimerRepeat(tick, 2)
+		self:Console("poll loop started interval=2")
+		self:Poll()
 	end
 
 	@ExecSpace("ServerOnly")
@@ -82,7 +107,12 @@ script VillageRelay extends Component
 			return
 		end
 		local body = { pairingCode = code }
-		local response = _HttpService:PostAndWait(self.RelayBase .. "/pair", _HttpService:JSONEncode(body), HttpContentType.ApplicationJson, { ["Content-Type"] = "application/json" })
+		self:PostRelay("/pair", _HttpService:JSONEncode(body))
+		local response = self.HttpBody
+		if response == "" then
+			self:PushStatus("연결 실패: 페어링 응답 없음")
+			return
+		end
 		local decoded = _HttpService:JSONDecode(response)
 		if decoded == nil or decoded.worldToken == nil then
 			self:PushStatus("페어링에 실패했습니다.")
@@ -140,7 +170,8 @@ script VillageRelay extends Component
 	@ExecSpace("ServerOnly")
 	method void SendCommand(string commandId, string commandType, table payload)
 		if self.WorldToken == "" or self.ClockOffset == nil then
-			self:PushStatus("릴레이 시각으로 시계를 맞추지 못했습니다.")
+			self:Console("command skipped tokenLen=" .. tostring(string.len(self.WorldToken)) .. " clock=" .. tostring(self.ClockOffset ~= nil))
+			self:PushStatus("연결 실패: 시계가 없습니다")
 			return
 		end
 		local body = {
@@ -149,44 +180,123 @@ script VillageRelay extends Component
 			issuedAt = DateTime.UtcNow.Elapsed + self.ClockOffset,
 			payload = payload
 		}
+		self:PostRelay("/commands", _HttpService:JSONEncode(body))
+		if self.HttpBody == "" then
+			self:PushStatus("연결 실패: 명령 응답 없음")
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void Console(string line)
+		log("[AgentMaple] " .. line)
+		print("[AgentMaple] " .. line)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void RememberSnippet(string text)
+		local snippet = ""
+		if text ~= nil then
+			snippet = tostring(text)
+		end
+		if self.WorldToken ~= "" then
+			snippet = string.gsub(snippet, self.WorldToken, "redacted")
+		end
+		snippet = string.gsub(snippet, [["worldToken"%s*:%s*"[^"]*"]], [["worldToken":"redacted"]])
+		snippet = string.gsub(snippet, "Bearer [^%s\"]+", "Bearer redacted")
+		if string.len(snippet) > 180 then
+			snippet = string.sub(snippet, 1, 180)
+		end
+		self.HttpSnippet = snippet
+	end
+
+	@ExecSpace("ServerOnly")
+	method void PostRelay(string path, string encoded)
+		-- PostAndWait returns the body only. The HttpService page has no status code.
 		local headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. self.WorldToken }
-		local response = _HttpService:PostAndWait(self.RelayBase .. "/commands", _HttpService:JSONEncode(body), HttpContentType.ApplicationJson, headers)
-		log("[AgentMaple] command " .. commandId .. " -> " .. tostring(response))
+		self:Console("POST " .. path .. " begin baseLen=" .. tostring(string.len(self.RelayBase)) .. " tokenLen=" .. tostring(string.len(self.WorldToken)))
+		local response = _HttpService:PostAndWait(self.RelayBase .. path, encoded, HttpContentType.ApplicationJson, headers)
+		local raw = ""
+		if response ~= nil then
+			raw = tostring(response)
+		end
+		self:RememberSnippet(raw)
+		self:Console("POST " .. path .. " done bodyLen=" .. tostring(string.len(raw)) .. " status=unavailable snippet=" .. self.HttpSnippet)
+		self.HttpBody = raw
+	end
+
+	@ExecSpace("ServerOnly")
+	method void NoteServerTime(number serverTime)
+		self.ClockOffset = serverTime - DateTime.UtcNow.Elapsed
+		self:Console("clock offset set")
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SyncClockFromTime()
+		self:PostRelay("/time", "{}")
+		local response = self.HttpBody
+		if response == "" then
+			self:PushStatus("연결 실패: /time 응답 없음")
+			return
+		end
+		local decoded = _HttpService:JSONDecode(response)
+		if decoded == nil or decoded.serverTime == nil then
+			self:PushStatus("연결 실패: serverTime 없음")
+			return
+		end
+		self:NoteServerTime(decoded.serverTime)
 	end
 
 	@ExecSpace("ServerOnly")
 	method void Poll()
-		if self.Busy or self.WorldToken == "" then
+		if self.Busy == true then
+			return
+		end
+		if self.WorldToken == "" then
+			self:Console("poll skipped WorldTokenLen=0 RelayBaseLen=" .. tostring(string.len(self.RelayBase)))
+			self:PushStatus("연결 실패: WorldToken이 비어 있습니다")
 			return
 		end
 		self.Busy = true
-		local body = { afterEventSeq = self.Cursor }
-		local headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. self.WorldToken }
-		local response = _HttpService:PostAndWait(self.RelayBase .. "/state", _HttpService:JSONEncode(body), HttpContentType.ApplicationJson, headers)
-		if response == nil or response == "" then
-			self:PushStatus("공개 릴레이가 없습니다.")
-			self.Busy = false
+		self.PollStartedAt = DateTime.UtcNow.Elapsed
+		self:PostRelay("/state", _HttpService:JSONEncode({ afterEventSeq = self.Cursor }))
+		self.Busy = false
+		local response = self.HttpBody
+		if response == "" then
+			self:PushStatus("연결 실패: 빈 응답")
 			return
 		end
 		local decoded = _HttpService:JSONDecode(response)
 		if decoded == nil then
-			self:PushStatus("공개 릴레이가 없습니다.")
-			self.Busy = false
+			self:PushStatus("연결 실패: JSON이 아님")
 			return
 		end
-		if decoded ~= nil then
-			if decoded.mode == "snapshot" and decoded.view ~= nil then
-				self:ApplyView(decoded.view)
-			elseif decoded.events ~= nil then
-				for i = 1, #decoded.events do
-					self:ApplyEvent(decoded.events[i])
-				end
-			end
-			if decoded.cursor ~= nil then
-				self.Cursor = decoded.cursor
-			end
+		if decoded.ok == false then
+			local reason = decoded.message or decoded.error or "거부"
+			self:PushStatus("연결 실패: " .. tostring(reason))
+			return
 		end
-		self.Busy = false
+		if decoded.serverTime ~= nil then
+			self:NoteServerTime(decoded.serverTime)
+		else
+			self:SyncClockFromTime()
+		end
+		if decoded.mode == "snapshot" and decoded.view ~= nil then
+			self:ApplyView(decoded.view)
+		elseif decoded.events ~= nil then
+			for i = 1, #decoded.events do
+				self:ApplyEvent(decoded.events[i])
+			end
+			self:PushStatus("연결됨")
+		else
+			self:PushStatus("연결됨")
+		end
+		if decoded.cursor ~= nil then
+			self.Cursor = decoded.cursor
+		end
+		if self.CharactersBound ~= true and self.ClockOffset ~= nil then
+			self:BindDefaultCharacters()
+			self.CharactersBound = true
+		end
 	end
 
 	@ExecSpace("ServerOnly")
@@ -217,7 +327,9 @@ script VillageRelay extends Component
 			end
 		end
 		if view.status ~= nil and view.status.phase ~= nil then
-			self:PushStatus("상태: " .. tostring(view.status.phase))
+			self:PushStatus("연결됨 · " .. tostring(view.status.phase))
+		else
+			self:PushStatus("연결됨")
 		end
 		if view.library ~= nil and view.library.panel ~= nil and view.library.panel.text ~= nil then
 			self:PushLibrary(view.library.panel.text)
@@ -429,16 +541,26 @@ script VillageRelay extends Component
 		if character == nil then
 			return
 		end
+		local leaf = "Worker"
 		local npcPath = self.WorkerNpcPath
 		if character.role == "lead" then
+			leaf = "Foreman"
 			npcPath = self.ForemanNpcPath
 		end
 		local npc = _EntityService:GetEntityByPath(npcPath)
 		if npc == nil or npc.OfficeNpc == nil then
-			log("[AgentMaple] NPC path not found: " .. npcPath)
+			npc = _EntityService:GetEntityByPath("/maps/map01/" .. leaf)
+		end
+		if npc == nil or npc.OfficeNpc == nil then
+			npc = _EntityService:GetEntityByPath("/maps/AgentMapleVillage/" .. leaf)
+		end
+		if npc == nil or npc.OfficeNpc == nil then
+			self:Console("NPC path not found: " .. tostring(npcPath))
 			return
 		end
-		npc.OfficeNpc.SessionId = character.sessionId
+		if character.sessionId ~= nil then
+			npc.OfficeNpc.SessionId = character.sessionId
+		end
 		if character.homeX ~= nil then
 			npc.OfficeNpc.HomeX = character.homeX
 		end
@@ -488,7 +610,8 @@ script VillageRelay extends Component
 			if npc.OfficeNpc.SlotLabel ~= nil and npc.OfficeNpc.SlotLabel ~= "" then
 				slot = npc.OfficeNpc.SlotLabel .. " · "
 			end
-			npc.NameTagComponent.Name = character.displayName .. " · " .. slot .. stateLabel
+			local displayName = character.displayName or leaf
+			npc.NameTagComponent.Name = displayName .. " · " .. slot .. stateLabel
 		end
 		if npc.ChatBalloonComponent ~= nil and linked and character.station == "user" then
 			npc.ChatBalloonComponent.Message = character.activity

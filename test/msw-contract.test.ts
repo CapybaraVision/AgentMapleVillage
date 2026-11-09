@@ -49,7 +49,13 @@ describe('msw script contract', () => {
     expect(relay).toContain('self.ClockOffset');
     expect(relay).toContain('DateTime.UtcNow.Elapsed + self.ClockOffset');
     expect(relay).not.toContain('issuedAt = DateTime.UtcNow.Elapsed,');
-    expect(npc).toContain('CaptureOwnerOnNextEnter');
+    expect(npc).toContain('CaptureOwnerOnNextEnter = true');
+    expect(relay).toContain('poll loop started');
+    expect(relay).toContain('/time');
+    expect(relay).toContain('연결 실패:');
+    expect(relay).toContain('연결됨');
+    expect(relay).toContain('WorldTokenLen=');
+    expect(relay).not.toContain('OnBeginPlay clears it');
     expect(npc).not.toContain('if self.OwnerUserId == "" then\n\t\t\tself.OwnerUserId = event.UserId');
     expect(hall).not.toContain('documentVersion');
     expect(desk).toContain('질문이 오면 여기에 표시됩니다.');

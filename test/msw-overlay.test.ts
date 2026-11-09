@@ -370,7 +370,29 @@ describe('Basic workspace deploy', () => {
     expect(foreman?.find((component) => component['@type'] === 'MOD.Core.SpriteRendererComponent')?.Enable).toBe(false);
     expect(foreman?.some((component) => typeof component.MaterialId === 'string' && component.MaterialId.length > 0)).toBe(false);
     const portal = written.ContentProto.Entities.find((entity) => entity.path === '/maps/map01/PortalLibrary');
-    expect(portal?.jsonString?.['@components']?.some((component) => component['@type'] === 'MOD.Core.PortalComponent')).toBe(true);
+    const portalComponent = portal?.jsonString?.['@components']?.find((component) => component['@type'] === 'MOD.Core.PortalComponent');
+    expect(portalComponent?.Enable).toBe(true);
+    expect(portalComponent?.IsLegacy).toBe(false);
+    expect(portalComponent?.TargetPortal).toBeUndefined();
+    const foremanNpc = foreman?.find((component) => component['@type'] === 'script.OfficeNpc');
+    expect(foremanNpc?.CaptureOwnerOnNextEnter).toBe(true);
+    const seeded = JSON.parse(fs.readFileSync(path.join(workspace, 'map/map01.map'), 'utf8')) as {
+      ContentProto: { Entities: Array<{ path?: string; jsonString?: { '@components'?: Array<Record<string, unknown>> } }> };
+    };
+    const seededPortal = seeded.ContentProto.Entities.find((entity) => entity.path === '/maps/map01/PortalLibrary');
+    const seededComponent = seededPortal?.jsonString?.['@components']?.find((component) => component['@type'] === 'MOD.Core.PortalComponent');
+    if (seededComponent) seededComponent.TargetPortal = 'keep-ref';
+    fs.writeFileSync(path.join(workspace, 'map/map01.map'), JSON.stringify(seeded));
+    expect(runDeploy(workspace).status).toBe(0);
+    const again = JSON.parse(fs.readFileSync(path.join(workspace, 'map/map01.map'), 'utf8')) as {
+      ContentProto: { Entities: Array<{ path?: string; jsonString?: { '@components'?: Array<Record<string, unknown>> } }> };
+    };
+    const againRelay = again.ContentProto.Entities.find((entity) => entity.path === '/maps/map01/VillageRelay')?.jsonString?.['@components']?.find((component) => component['@type'] === 'script.VillageRelay');
+    expect(againRelay?.RelayBase).toBe('https://tunnel.example/v1');
+    expect(againRelay?.WorldToken).toBe('keep-token');
+    const againPortal = again.ContentProto.Entities.find((entity) => entity.path === '/maps/map01/PortalLibrary')?.jsonString?.['@components']?.find((component) => component['@type'] === 'MOD.Core.PortalComponent');
+    expect(againPortal?.IsLegacy).toBe(false);
+    expect(againPortal?.TargetPortal).toBe('keep-ref');
     expect(fs.existsSync(path.join(workspace, 'Global/SectorConfig.config'))).toBe(false);
     const office = JSON.parse(fs.readFileSync(path.join(workspace, 'map/AgentMapleOffice.map'), 'utf8')) as {
       EntryKey?: string;
