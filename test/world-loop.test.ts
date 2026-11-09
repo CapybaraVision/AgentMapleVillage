@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { anchorFor, boardText, bookIdsFromSearch, meetingGathering } from '../src/world-loop.js';
+import { anchorFor, boardText, bookIdsFromSearch, meetingGathering, shouldHold } from '../src/world-loop.js';
 
 describe('world loop anchors', () => {
   it('maps real session state to a floor anchor and stays home when the relay is down', () => {
@@ -30,6 +30,15 @@ describe('world loop anchors', () => {
     expect(boardText({ tab: 'test', feed: [], decisions: [] })).toBe('기록된 테스트 출력이 없습니다.');
     expect(boardText({ tab: 'review', feed: [], decisions: [{ status: 'open', sessionId: 'ses_worker', question: '진행할까요?' }] })).toContain('진행할까요?');
     expect(boardText({ tab: 'change', feed: [{ kind: 'change', sessionId: 'ses_worker', text: 'notes.txt' }], decisions: [] })).toContain('notes.txt');
+  });
+
+  it('stops at the anchor and moves again only when the target changes', () => {
+    const arrived = shouldHold({ holding: false, lastTargetX: 0, targetX: 5, x: 5 });
+    expect(arrived).toMatchObject({ holding: true, move: false, lastTargetX: 5 });
+    const stayed = shouldHold({ holding: true, lastTargetX: 5, targetX: 5.2, x: 5 });
+    expect(stayed.move).toBe(false);
+    const retarget = shouldHold({ holding: true, lastTargetX: 5, targetX: 1, x: 5 });
+    expect(retarget).toMatchObject({ holding: false, move: true });
   });
 
   it('turns search cards into book ids', () => {

@@ -45,7 +45,6 @@ const BODY_BY_MODE = {
 const BODY_TYPES = new Set(Object.values(BODY_BY_MODE));
 const SCRIPT_PROPERTY_DEFAULTS = {
   'script.VillageRelay': {
-    WorldToken: '',
     ClockOffset: null,
     OpenDecisionId: '',
     Busy: false,
@@ -154,6 +153,9 @@ export function planDeployment(root, overlay) {
     const targetRoot = `/maps/${mapInfo.rootName}`;
     const merged = mergeVillageOntoMap(mapJson, overlay, targetRoot, mapInfo.mode);
     changes.push({ rel: 'map/map01.map', body: `${JSON.stringify(merged, null, 2)}\n` });
+    for (const [file, id, label] of ROOM_MAPS) {
+      changes.push({ rel: path.join('map', file), body: roomMap(id, label) });
+    }
     for (const name of SCRIPT_FILES) {
       const source = fs.readFileSync(path.join(overlay, 'RootDesk/MyDesk/AgentMapleVillage', name), 'utf8');
       changes.push({
@@ -294,9 +296,137 @@ function mergeVillageOntoMap(mapJson, overlay, targetRoot, mode) {
     });
     existingPaths.add(nextPath);
   }
+  addPortals(entities, targetRoot, footholdY ?? standY, stringify);
   fillMissingScriptProperties(entities);
   ensureNpcTouch(entities);
   return merged;
+}
+
+const ROOM_MAPS = [
+  ['AgentMapleOffice.map', 'AgentMapleOffice', '지휘석'],
+  ['AgentMapleLibrary.map', 'AgentMapleLibrary', '도서관'],
+  ['AgentMapleMeeting.map', 'AgentMapleMeeting', '회의실'],
+  ['AgentMapleNotice.map', 'AgentMapleNotice', '게시판'],
+];
+
+function addPortals(entities, targetRoot, standY, stringify) {
+  const spots = [
+    ['PortalOffice', -4, '지휘석'],
+    ['PortalLibrary', -2, '도서관'],
+    ['PortalMeeting', 2, '회의실'],
+    ['PortalNotice', 4, '게시판'],
+  ];
+  const paths = new Set(entities.map((entity) => entityJson(entity).path || entity.path));
+  for (const [name, x, label] of spots) {
+    const entityPath = `${targetRoot}/${name}`;
+    if (paths.has(entityPath)) continue;
+    const entity = portalEntity(targetRoot, name, x, standY, label);
+    if (stringify) writeEntity(entity, entityJson(entity), true);
+    entities.push(entity);
+  }
+}
+
+function portalEntity(root, name, x, y, label) {
+  const id = crypto.randomUUID();
+  const entityPath = `${root}/${name}`;
+  return {
+    id,
+    path: entityPath,
+    componentNames: 'MOD.Core.TransformComponent,MOD.Core.SpriteRendererComponent,MOD.Core.PortalComponent,MOD.Core.NameTagComponent',
+    jsonString: {
+      name,
+      path: entityPath,
+      enable: true,
+      visible: true,
+      '@components': [
+        { '@type': 'MOD.Core.TransformComponent', Position: { x, y, z: 0 }, Enable: true },
+        { '@type': 'MOD.Core.SpriteRendererComponent', SpriteRUID: VERIFIED_SPRITE_RUID, Enable: true, SortingLayer: 'Default' },
+        { '@type': 'MOD.Core.PortalComponent', Enable: true },
+        { '@type': 'MOD.Core.NameTagComponent', Enable: true, Name: label },
+      ],
+    },
+  };
+}
+
+function roomMap(id, label) {
+  const strip = FLOOR_STRIPS.modes['0'];
+  const tiles = strip.tiles.filter((tile) => tile.position.x >= -6 && tile.position.x <= 6 && tile.position.y >= -2);
+  const footholds = (strip.footholds || []).filter((item) => item.StartPoint.x >= -8 && item.EndPoint.x <= 8).slice(0, 6);
+  const rootId = crypto.randomUUID();
+  const tileId = crypto.randomUUID();
+  const entities = [
+    {
+      id: rootId,
+      path: `/maps/${id}`,
+      componentNames: 'MOD.Core.MapComponent,MOD.Core.FootholdComponent',
+      jsonString: {
+        name: id,
+        path: `/maps/${id}`,
+        enable: true,
+        '@components': [
+          {
+            '@type': 'MOD.Core.MapComponent',
+            IsInstanceMap: false,
+            TileMapMode: 0,
+            Enable: true,
+            Gravity: 1,
+            WalkAccelerationFactor: 1,
+            WalkDrag: 1,
+            AirAccelerationXFactor: 1,
+            AirDecelerationXFactor: 1,
+            FallSpeedMaxXFactor: 1,
+            FallSpeedMaxYFactor: 1,
+          },
+          { '@type': 'MOD.Core.FootholdComponent', Enable: true, FootholdsByLayer: { 1: footholds.map((item) => ({ ...item, OwnerId: tileId })) } },
+        ],
+      },
+    },
+    {
+      id: tileId,
+      path: `/maps/${id}/TileMap`,
+      componentNames: 'MOD.Core.TransformComponent,MOD.Core.TileMapComponent',
+      jsonString: {
+        name: 'TileMap',
+        path: `/maps/${id}/TileMap`,
+        enable: true,
+        '@components': [
+          { '@type': 'MOD.Core.TransformComponent', Position: { x: 0, y: 0, z: 1000 }, Enable: true },
+          { '@type': 'MOD.Core.TileMapComponent', Enable: true, SortingLayer: 'MapLayer0', TileSetRUID: structuredClone(strip.tileSetRuid), Tiles: tiles },
+        ],
+      },
+    },
+    spawnEntity(`/maps/${id}`, footholds[0]?.StartPoint?.y ?? 0),
+    portalEntity(`/maps/${id}`, 'PortalSquare', -3, footholds[0]?.StartPoint?.y ?? 0, '광장'),
+  ];
+  if (id === 'AgentMapleOffice' || id === 'AgentMapleMeeting') {
+    const station = id === 'AgentMapleOffice' ? 'desk' : 'meeting';
+    entities.push(actorEntity(`/maps/${id}`, 'Foreman', -1, footholds[0]?.StartPoint?.y ?? 0, 'ses_foreman', station));
+    entities.push(actorEntity(`/maps/${id}`, 'Worker', 1, footholds[0]?.StartPoint?.y ?? 0, 'ses_worker', station));
+  }
+  if (id === 'AgentMapleLibrary') entities.push(actorEntity(`/maps/${id}`, 'Guide', 0, footholds[0]?.StartPoint?.y ?? 0, '', 'library'));
+  return `${JSON.stringify({ ContentType: 'x-mod/map', EntryKey: `map://${id}`, ContentProto: { Entities: entities } }, null, 2)}\n`;
+}
+
+function actorEntity(root, name, x, y, sessionId, station) {
+  const id = crypto.randomUUID();
+  const entityPath = `${root}/${name}`;
+  const js = {
+    name,
+    path: entityPath,
+    enable: true,
+    '@components': [
+      { '@type': 'MOD.Core.TransformComponent', Position: { x, y, z: 0 }, Enable: true },
+      { '@type': 'MOD.Core.SpriteRendererComponent', SpriteRUID: VERIFIED_SPRITE_RUID, Enable: false, SortingLayer: 'Default' },
+      { '@type': 'MOD.Core.NameTagComponent', Enable: true, Name: name === 'Guide' ? '안내' : name === 'Foreman' ? '감독관' : '작업자' },
+      { '@type': 'MOD.Core.MovementComponent', Enable: true },
+      { '@type': 'MOD.Core.RigidbodyComponent', Enable: true },
+      name === 'Guide'
+        ? { '@type': 'script.GuidePost', Enable: true }
+        : { '@type': 'script.OfficeNpc', Enable: true, SessionId: sessionId || 'ses_foreman', Station: station, Pace: false, Holding: false, HomeX: x, DeskX: x, MeetingX: x, FloorY: y, DeskY: y, DeskSaved: true },
+    ],
+  };
+  useDefaultAvatar(js);
+  return { id, path: entityPath, componentNames: js['@components'].map((component) => component['@type']).join(','), jsonString: js };
 }
 
 function ensureFloor(mapJson, mode, targetRoot, stringify) {
@@ -563,11 +693,28 @@ function placeOnFloor(js, standY) {
     npc.FloorY = standY;
     npc.DeskY = standY;
     npc.DeskSaved = true;
-    npc.Station = 'home';
-    npc.Pace = true;
-    npc.ActivityText = '집에서 쉬는 중';
+    if (!Object.prototype.hasOwnProperty.call(npc, 'Station')) npc.Station = 'home';
+    npc.Pace = false;
+    npc.Holding = false;
+    if (!Object.prototype.hasOwnProperty.call(npc, 'ActivityText')) npc.ActivityText = '집에서 쉬는 중';
   }
+  if (name === 'Foreman' || name === 'Worker' || name === 'Guide') useDefaultAvatar(js);
   return js;
+}
+
+const VERIFIED_SPRITE_RUID = '8ef238e0d0ca4bb783aca526cff35d11';
+
+function useDefaultAvatar(js) {
+  const sprite = (js['@components'] ?? []).find((component) => component['@type'] === 'MOD.Core.SpriteRendererComponent');
+  if (sprite) sprite.Enable = false;
+  const present = new Set((js['@components'] ?? []).map((component) => component['@type']));
+  const add = [];
+  if (!present.has('MOD.Core.AvatarRendererComponent')) {
+    add.push({ '@type': 'MOD.Core.AvatarRendererComponent', Enable: true, OrderInLayer: 2, SortingLayer: 'Default' });
+  }
+  if (!present.has('MOD.Core.CostumeManagerComponent')) add.push({ '@type': 'MOD.Core.CostumeManagerComponent', Enable: true });
+  if (!present.has('MOD.Core.AvatarStateAnimationComponent')) add.push({ '@type': 'MOD.Core.AvatarStateAnimationComponent', Enable: true });
+  js['@components'] = [...(js['@components'] ?? []), ...add];
 }
 
 function writeEntity(entity, js, stringify) {

@@ -34,9 +34,11 @@ script VillageRelay extends Component
 	property number Cursor = 0
 	property number CommandCounter = 0
 	property string NoticeLines = ""
+	property boolean ShowDebug = false
+	property string ForemanStation = "home"
+	property string WorkerStation = "home"
 	@ExecSpace("ServerOnly")
 	method void OnBeginPlay()
-		self.WorldToken = ""
 		self.ClockOffset = nil
 		self.OpenDecisionId = ""
 		self.OpenBookId = ""
@@ -44,6 +46,7 @@ script VillageRelay extends Component
 		self.Cursor = 0
 		self.CommandCounter = 0
 		self.NoticeLines = ""
+		self:HideEmptyAnchors()
 		local tick = function()
 			self:Poll()
 		end
@@ -490,6 +493,12 @@ script VillageRelay extends Component
 		if npc.ChatBalloonComponent ~= nil and linked and character.station == "user" then
 			npc.ChatBalloonComponent.Message = character.activity
 		end
+		if character.role == "lead" then
+			self.ForemanStation = linked and (character.station or "home") or "home"
+		else
+			self.WorkerStation = linked and (character.station or "home") or "home"
+		end
+		self:PlaceActors()
 		if npc.OfficeStatus ~= nil then
 			npc.OfficeStatus.Station = linked and (character.station or "home") or "home"
 			if linked == false then
@@ -498,6 +507,61 @@ script VillageRelay extends Component
 				npc.OfficeStatus.StatusLine = stateLabel .. "\n" .. (character.activity or "")
 			end
 		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void HideEmptyAnchors()
+		self:ShowMarker(self.BookWorkPath, false)
+		self:ShowMarker(self.BookSourcePath, false)
+		self:ShowMarker("/maps/map01/Desk1", false)
+		self:ShowMarker("/maps/map01/Desk2", false)
+		self:ShowMarker("/maps/map01/Desk3", false)
+		self:ShowMarker("/maps/map01/Desk4", false)
+		self:ShowMarker("/maps/map01/Desk5", false)
+		self:ShowMarker("/maps/map01/Desk6", false)
+		self:ShowMarker("/maps/map01/HomeForeman", false)
+		self:ShowMarker("/maps/map01/HomeWorker", false)
+		self:ShowMarker("/maps/map01/MeetingRoom", false)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void PlaceActors()
+		local debug = self.ShowDebug == true
+		self:ShowMarker("/maps/map01/Desk1", debug or self.ForemanStation == "desk")
+		self:ShowMarker("/maps/map01/Desk2", debug or self.WorkerStation == "desk")
+		self:ShowMarker("/maps/map01/HomeForeman", debug or self.ForemanStation == "home")
+		self:ShowMarker("/maps/map01/HomeWorker", debug or self.WorkerStation == "home")
+		local meeting = self.ForemanStation == "meeting" or self.WorkerStation == "meeting"
+		self:ShowMarker("/maps/map01/MeetingRoom", debug or meeting)
+		self:ShowActor("/maps/map01/Foreman", self.ForemanStation == "home" or self.ForemanStation == "user")
+		self:ShowActor("/maps/map01/Worker", self.WorkerStation == "home" or self.WorkerStation == "user")
+		self:ShowActor("/maps/AgentMapleOffice/Foreman", self.ForemanStation == "desk")
+		self:ShowActor("/maps/AgentMapleOffice/Worker", self.WorkerStation == "desk")
+		self:ShowActor("/maps/AgentMapleMeeting/Foreman", self.ForemanStation == "meeting")
+		self:ShowActor("/maps/AgentMapleMeeting/Worker", self.WorkerStation == "meeting")
+	end
+
+	@ExecSpace("ServerOnly")
+	method void ShowMarker(string path, boolean show)
+		local marker = _EntityService:GetEntityByPath(path)
+		if marker == nil then
+			return
+		end
+		if marker.SpriteRendererComponent ~= nil then
+			marker.SpriteRendererComponent.Enable = show
+		end
+		if marker.NameTagComponent ~= nil then
+			marker.NameTagComponent.Enable = show
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void ShowActor(string path, boolean show)
+		local actor = _EntityService:GetEntityByPath(path)
+		if actor == nil then
+			return
+		end
+		actor.Enable = show
 	end
 
 	@ExecSpace("ServerOnly")

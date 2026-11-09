@@ -340,6 +340,55 @@ describe('Basic workspace deploy', () => {
     expect(spawnPos.Position?.y).toBeCloseTo(-0.04);
   });
 
+  it('keeps an existing relay address and token, adds a default avatar, and writes room maps', () => {
+    const { workspace } = basicWorkspace(0, false);
+    const map = JSON.parse(fs.readFileSync(path.join(workspace, 'map/map01.map'), 'utf8')) as {
+      ContentProto: { Entities: Array<Record<string, unknown>> };
+    };
+    map.ContentProto.Entities.push({
+      id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      path: '/maps/map01/VillageRelay',
+      componentNames: 'script.VillageRelay',
+      jsonString: {
+        name: 'VillageRelay',
+        path: '/maps/map01/VillageRelay',
+        '@components': [{ '@type': 'script.VillageRelay', Enable: true, RelayBase: 'https://tunnel.example/v1', WorldToken: 'keep-token', ShowDebug: true }],
+      },
+    });
+    fs.writeFileSync(path.join(workspace, 'map/map01.map'), JSON.stringify(map));
+    expect(runDeploy(workspace).status).toBe(0);
+    const written = JSON.parse(fs.readFileSync(path.join(workspace, 'map/map01.map'), 'utf8')) as {
+      ContentProto: { Entities: Array<{ path?: string; jsonString?: { '@components'?: Array<Record<string, unknown>> } }> };
+    };
+    const relay = written.ContentProto.Entities.find((entity) => entity.path === '/maps/map01/VillageRelay')?.jsonString?.['@components']?.find((component) => component['@type'] === 'script.VillageRelay');
+    expect(relay?.RelayBase).toBe('https://tunnel.example/v1');
+    expect(relay?.WorldToken).toBe('keep-token');
+    expect(relay?.ShowDebug).toBe(true);
+    const foreman = written.ContentProto.Entities.find((entity) => entity.path === '/maps/map01/Foreman')?.jsonString?.['@components'];
+    expect(foreman?.some((component) => component['@type'] === 'MOD.Core.AvatarRendererComponent')).toBe(true);
+    expect(foreman?.some((component) => component['@type'] === 'MOD.Core.CostumeManagerComponent')).toBe(true);
+    expect(foreman?.find((component) => component['@type'] === 'MOD.Core.SpriteRendererComponent')?.Enable).toBe(false);
+    expect(foreman?.some((component) => typeof component.MaterialId === 'string' && component.MaterialId.length > 0)).toBe(false);
+    const portal = written.ContentProto.Entities.find((entity) => entity.path === '/maps/map01/PortalLibrary');
+    expect(portal?.jsonString?.['@components']?.some((component) => component['@type'] === 'MOD.Core.PortalComponent')).toBe(true);
+    expect(fs.existsSync(path.join(workspace, 'Global/SectorConfig.config'))).toBe(false);
+    const office = JSON.parse(fs.readFileSync(path.join(workspace, 'map/AgentMapleOffice.map'), 'utf8')) as {
+      EntryKey?: string;
+      ContentProto?: { Entities?: Array<{ path?: string; jsonString?: { '@components'?: Array<Record<string, unknown>> } }> };
+    };
+    expect(office.EntryKey).toBe('map://AgentMapleOffice');
+    const officeMap = office.ContentProto?.Entities?.find((entity) => entity.path === '/maps/AgentMapleOffice')?.jsonString?.['@components']?.find((component) => component['@type'] === 'MOD.Core.MapComponent');
+    expect(officeMap?.TileMapMode).toBe(0);
+    expect(officeMap?.Gravity).toBe(1);
+    const officeTiles = office.ContentProto?.Entities?.find((entity) => entity.path === '/maps/AgentMapleOffice/TileMap')?.jsonString?.['@components']?.find((component) => component['@type'] === 'MOD.Core.TileMapComponent');
+    expect((officeTiles?.TileSetRUID as { DataId?: string }).DataId).toBe('9dfea3808bbd49a5877d8624df21b1c7');
+    expect(office.ContentProto?.Entities?.some((entity) => entity.path === '/maps/AgentMapleOffice/PortalSquare')).toBe(true);
+    expect(office.ContentProto?.Entities?.some((entity) => entity.path === '/maps/AgentMapleOffice/SpawnLocation')).toBe(true);
+    for (const file of ['AgentMapleLibrary.map', 'AgentMapleMeeting.map', 'AgentMapleNotice.map']) {
+      expect(fs.existsSync(path.join(workspace, 'map', file))).toBe(true);
+    }
+  });
+
   it('rejects a SectorConfig whose entries are not a string array before any write', () => {
     for (const entries of [1, { 'map://map01': true }, null]) {
       const { parent, workspace, mapBytes } = basicWorkspace();
@@ -451,7 +500,7 @@ describe('Basic workspace deploy', () => {
     const relay = written.ContentProto.Entities.find((entity) => entity.path === '/maps/map01/VillageRelay');
     const script = relay?.jsonString?.['@components']?.find((component) => component['@type'] === 'script.VillageRelay');
     expect(script?.RelayBase).toBe('https://user.example/v1');
-    expect(script?.WorldToken).toBe('');
+    expect(script?.WorldToken).toBeUndefined();
     expect(script?.ClockOffset).toBeNull();
     expect(script?.CommandCounter).toBe(0);
   });

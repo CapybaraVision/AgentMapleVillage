@@ -41,6 +41,19 @@ export function boardText(input: {
   return open.map((item) => `${item.sessionId} ${item.question}`).join('\n');
 }
 
+export function shouldHold(input: { holding: boolean; lastTargetX: number; targetX: number; x: number; arrive?: number; retarget?: number }): { holding: boolean; move: boolean; lastTargetX: number } {
+  const arrive = input.arrive ?? 0.25;
+  const retarget = input.retarget ?? 0.35;
+  const targetMoved = Math.abs(input.targetX - input.lastTargetX) > retarget;
+  if (input.holding && !targetMoved) return { holding: true, move: false, lastTargetX: input.lastTargetX };
+  if (Math.abs(input.targetX - input.x) <= arrive) return { holding: true, move: false, lastTargetX: input.targetX };
+  return { holding: false, move: true, lastTargetX: input.lastTargetX };
+}
+
+export function markerVisible(input: { occupied: boolean; debug: boolean }): boolean {
+  return input.debug || input.occupied;
+}
+
 export function bookIdsFromSearch(cards: Array<{ id?: string }>): string[] {
   return cards.map((card) => card.id).filter((id): id is string => typeof id === 'string' && id.startsWith('kn_')).slice(0, 2);
 }

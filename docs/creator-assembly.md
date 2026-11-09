@@ -50,7 +50,9 @@ node tools/deploy-msw-overlay.mjs C:\path\to\the\exported\LocalWorkspace
 
 `workspace.inspect`는 그 세션 폴더에서 `git status`와 `git diff --numstat`만 실행합니다. 명령 문자열은 받지 않습니다. 게시판의 변경 줄은 그 출력입니다. 테스트 결과가 없으면 없다고 적습니다. 승인된 쓰기용 Claude 인자는 `--permission-mode default`이고 권한 우회 플래그는 없습니다. 클라우드 테스트는 프로세스를 주입합니다. 집 PC에서 실제 CLI를 켜는 프로브는 `AGENTMAPLE_RUN_CLAUDE_PROBE=1`이 있을 때만 읽기 전용으로 돕니다.
 
-책 엔티티를 누르면 `library.read`로 그 `kn_`의 본문, 개정 목록, 출처 이름, 연결된 id를 받아 말풍선과 도서관 글에 넣습니다. 릴레이가 없으면 제목만 있고 본문은 받지 못했다고 적습니다. 안내원은 답을 만들지 않고, 연결되면 저장된 목록만 요청합니다. NPC 이름표는 연결이 없으면 `연결 끊김`, 있으면 자리 값만 `작업 중`, `질문`, `회의`, `집`으로 적습니다. 가구로 새로 확인한 RUID는 없습니다. 책상과 서가는 빌더 기본 스프라이트이고, 배경은 맵에 이미 있는 Background를 바꾸지 않습니다.
+책 엔티티를 누르면 `library.read`로 그 `kn_`의 본문, 개정 목록, 출처 이름, 연결된 id를 받아 말풍선과 도서관 글에 넣습니다. 릴레이가 없으면 제목만 있고 본문은 받지 못했다고 적습니다. 안내원은 답을 만들지 않고, 연결되면 저장된 목록만 요청합니다. NPC 이름표는 연결이 없으면 `연결 끊김`, 있으면 자리 값만 `작업 중`, `질문`, `회의`, `집`으로 적습니다. NPC가 유령으로 보인 것은 빌더 기본 스프라이트 `8ef238e0d0ca4bb783aca526cff35d11`입니다. 감독관, 작업자, 안내는 그 스프라이트를 끄고, 공식 `player` 모델과 같은 `AvatarRendererComponent`, `CostumeManagerComponent`, `AvatarStateAnimationComponent`만 붙입니다. 코스튬 RUID는 그 모델에도 없어서 넣지 않았습니다. 역할마다 다른 옷은 확인하지 못했습니다. 포탈은 공식 `model://portal`의 `PortalComponent`이고, 별 모양 스프라이트 RUID는 찾지 못해 같은 기본 스프라이트를 씁니다. `PortalEntityRef`의 JSON 형식은 읽은 문서에 없어서 TargetPortal은 비워 둡니다. 메이커 참조 선택으로 연결해야 실제로 이동합니다. SectorConfig는 만들지 않습니다.
+
+가구로 새로 확인한 RUID는 없습니다. 책상과 서가는 빌더 기본 스프라이트이고, 배경은 맵에 이미 있는 Background를 바꾸지 않습니다.
 
 서가 둘은 맵 빌더 기본 스프라이트입니다. 아바타 의상 RUID는 공식 스킬 체크아웃에서 확인하지 못했습니다. 메이커 Preset에서 아바타를 고르되, 빈 16진 id를 만들지 않습니다. UI 빌더 `avatar()`의 `material_id` 기본값은 빈 문자열이라 의상으로 치지 않습니다.
 
