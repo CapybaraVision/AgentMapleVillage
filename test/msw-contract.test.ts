@@ -5,6 +5,10 @@ import { describe, expect, it } from 'vitest';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'msw', 'scripts');
 
+function readSource(file: string): string {
+  return fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
+}
+
 describe('msw script contract', () => {
   const files = fs.readdirSync(root).filter((file) => file.endsWith('.mlua'));
 
@@ -15,10 +19,10 @@ describe('msw script contract', () => {
   });
 
   it('matches the relay command names and stays inside the documented HTTP surface', () => {
-    const relay = fs.readFileSync(path.join(root, 'VillageRelay.mlua'), 'utf8');
-    const npc = fs.readFileSync(path.join(root, 'OfficeNpc.mlua'), 'utf8');
-    const desk = fs.readFileSync(path.join(root, 'GoalDesk.mlua'), 'utf8');
-    const hall = fs.readFileSync(path.join(root, 'LibraryHall.mlua'), 'utf8');
+    const relay = readSource(path.join(root, 'VillageRelay.mlua'));
+    const npc = readSource(path.join(root, 'OfficeNpc.mlua'));
+    const desk = readSource(path.join(root, 'GoalDesk.mlua'));
+    const hall = readSource(path.join(root, 'LibraryHall.mlua'));
     const all = `${relay}\n${npc}\n${desk}\n${hall}`;
     for (const token of ['goal.submit', 'decision.answer', 'character.bind', 'PostAndWait', 'ses_foreman', 'ses_worker', '이대로 진행', '거절']) {
       expect(all).toContain(token);
@@ -35,11 +39,11 @@ describe('msw script contract', () => {
     expect(relay).toContain('SubmitBookOpen');
     expect(relay).toContain('OpenAnswerPanel');
     expect(relay).toContain('SetTabs');
-    expect(fs.readFileSync(path.join(root, 'OfficeNpc.mlua'), 'utf8')).toContain('FlipX');
-    expect(fs.readFileSync(path.join(root, 'LibraryHall.mlua'), 'utf8')).toContain('OpenBoard');
+    expect(readSource(path.join(root, 'OfficeNpc.mlua'))).toContain('FlipX');
+    expect(readSource(path.join(root, 'LibraryHall.mlua'))).toContain('OpenBoard');
     expect(relay).toContain('연결 끊김');
     expect(relay).toContain('작업 중');
-    expect(fs.readFileSync(path.join(root, 'BookSpot.mlua'), 'utf8')).toContain('SubmitBookOpen');
+    expect(readSource(path.join(root, 'BookSpot.mlua'))).toContain('SubmitBookOpen');
     expect(npc).toContain('MoveToDirection');
     expect(npc).not.toContain('SetWorldPosition');
     expect(relay).toContain('library.search');
@@ -84,7 +88,7 @@ describe('msw script contract', () => {
   it('declares every assigned component field, which static tests can check and Creator play cannot be claimed here', () => {
     const required = ['WorldToken', 'ClockOffset', 'OpenDecisionId', 'Busy', 'Cursor', 'CommandCounter'];
     for (const file of files) {
-      const text = fs.readFileSync(path.join(root, file), 'utf8');
+      const text = readSource(path.join(root, file));
       const declared = new Set([...text.matchAll(/^\s*property\s+\S+\s+([A-Za-z_][A-Za-z0-9_]*)/gm)].map((match) => match[1]));
       const assigned = [...text.matchAll(/\bself\.([A-Za-z_][A-Za-z0-9_]*)\s*=/g)].map((match) => match[1]);
       for (const name of assigned) expect(declared.has(name), `${file} ${name}`).toBe(true);
@@ -94,7 +98,7 @@ describe('msw script contract', () => {
         expect(text).toContain('cannot set Name, no such field');
       }
     }
-    const desk = fs.readFileSync(path.join(root, 'GoalDesk.mlua'), 'utf8');
+    const desk = readSource(path.join(root, 'GoalDesk.mlua'));
     expect(desk).toContain('공개 릴레이가 없습니다.');
     expect(desk).not.toContain('마을 연결 전');
   });
@@ -104,7 +108,7 @@ describe('msw script contract', () => {
     const uiFiles = fs.readdirSync(uiDir).filter((file) => file.endsWith('.ui'));
     expect(uiFiles.length).toBeGreaterThan(0);
     for (const file of uiFiles) {
-      const ui = JSON.parse(fs.readFileSync(path.join(uiDir, file), 'utf8')) as {
+      const ui = JSON.parse(readSource(path.join(uiDir, file))) as {
         ContentProto?: { Entities?: Array<{ jsonString?: { path?: string; '@components'?: Array<Record<string, unknown>> } }> };
       };
       const rootPath = `/ui/${file.replace(/\.ui$/, '')}`;
@@ -112,13 +116,13 @@ describe('msw script contract', () => {
       const canvas = rootEntity?.jsonString?.['@components']?.find((component) => component['@type'] === 'MOD.Core.CanvasGroupComponent');
       expect(canvas?.BlocksRaycasts, file).toBe(true);
     }
-    const relay = fs.readFileSync(path.join(root, 'VillageRelay.mlua'), 'utf8');
+    const relay = readSource(path.join(root, 'VillageRelay.mlua'));
     expect(relay).toContain('@ExecSpace("Client")\n\tmethod void PushUi');
     expect(relay).toContain('@ExecSpace("Client")\n\tmethod void PushLibrary');
     expect(relay).toContain('@ExecSpace("Client")\n\tmethod void OpenAnswerPanel');
     expect(relay).toContain('@ExecSpace("ServerOnly")\n\tmethod void PushStatus');
     for (const file of ['GoalDesk.mlua', 'LibraryHall.mlua']) {
-      const text = fs.readFileSync(path.join(root, file), 'utf8');
+      const text = readSource(path.join(root, file));
       const writeAt = text.indexOf('method void WriteText');
       const write = text.slice(writeAt);
       const guiWrite = write.indexOf('entity.TextGUIRendererComponent.Text = text');
@@ -132,6 +136,6 @@ describe('msw script contract', () => {
       expect(read.indexOf('TextGUIRendererInputComponent')).toBeLessThan(read.indexOf('TextInputComponent'));
       expect(text).toContain('entity:SetEnable(enabled)');
     }
-    expect(fs.readFileSync(path.join(root, 'GoalDesk.mlua'), 'utf8')).toContain('지휘석 · 연결됨');
+    expect(readSource(path.join(root, 'GoalDesk.mlua'))).toContain('지휘석 · 연결됨');
   });
 });
