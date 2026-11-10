@@ -54,6 +54,7 @@ script VillageRelay extends Component
 	property boolean HttpLimited = false
 	property boolean RefreshOk = false
 	property boolean PollRetry = false
+	property string PostMethod = ""
 	@ExecSpace("ServerOnly")
 	method void OnBeginPlay()
 		self.ClockOffset = nil
@@ -73,6 +74,7 @@ script VillageRelay extends Component
 		self.LastRefreshAt = 0
 		self.HttpCount = 0
 		self.HttpWindowStart = 0
+		self.PostMethod = ""
 		self:HideEmptyAnchors()
 		self:PlaceActors()
 		local https = "false"
@@ -290,7 +292,7 @@ script VillageRelay extends Component
 		}
 		self:PostRelay("/commands", _HttpService:JSONEncode(body))
 		if self.HttpBody == "" then
-			self:PushStatus("연결 실패: 명령 응답 없음")
+			return
 		end
 	end
 
@@ -322,28 +324,83 @@ script VillageRelay extends Component
 	end
 
 	@ExecSpace("ServerOnly")
-	method void PostRelay(string path, string encoded)
-		-- PostAndWait returns the body only. The HttpService page has no status code.
+	method void CurrentBase()
+		self.HttpSnippet = self.ActiveBase
+		if self.HttpSnippet == "" then
+			self.HttpSnippet = self.RelayBase
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void GetRelay(string path)
 		self:ArmHttp()
 		if self.HttpLimited == true then
 			self.HttpBody = ""
 			self:PushStatus("연결 실패: 요청 한도")
 			return
 		end
-		local base = self.ActiveBase
-		if base == "" then
-			base = self.RelayBase
-		end
-		local headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. self.WorldToken }
-		self:Console("POST " .. path .. " begin baseLen=" .. tostring(string.len(base)) .. " tokenLen=" .. tostring(string.len(self.WorldToken)))
-		local response = _HttpService:PostAndWait(base .. path, encoded, HttpContentType.ApplicationJson, headers)
+		self:CurrentBase()
+		local base = self.HttpSnippet
+		local headers = { ["Authorization"] = "Bearer " .. self.WorldToken }
+		self:Console("GET " .. path .. " begin method=get baseLen=" .. tostring(string.len(base)) .. " tokenLen=" .. tostring(string.len(self.WorldToken)))
+		local response = _HttpService:GetAndWait(base .. path, headers)
 		local raw = ""
 		if response ~= nil then
 			raw = tostring(response)
 		end
 		self:RememberSnippet(raw)
-		self:Console("POST " .. path .. " done bodyLen=" .. tostring(string.len(raw)) .. " status=unavailable snippet=" .. self.HttpSnippet)
+		self:Console("GET " .. path .. " done method=get bodyLen=" .. tostring(string.len(raw)) .. " snippet=" .. self.HttpSnippet)
 		self.HttpBody = raw
+	end
+
+	@ExecSpace("ServerOnly")
+	method void PostRelay(string path, string encoded)
+		-- PostAndWait already receives HttpContentType.ApplicationJson. Do not repeat Content-Type in headers.
+		self:ArmHttp()
+		if self.HttpLimited == true then
+			self.HttpBody = ""
+			self:PushStatus("연결 실패: 요청 한도")
+			return
+		end
+		self:CurrentBase()
+		local base = self.HttpSnippet
+		local headers = { ["Authorization"] = "Bearer " .. self.WorldToken }
+		local raw = ""
+		local used = ""
+		if self.PostMethod ~= "request" then
+			self:Console("POST " .. path .. " begin method=post baseLen=" .. tostring(string.len(base)) .. " tokenLen=" .. tostring(string.len(self.WorldToken)))
+			local response = _HttpService:PostAndWait(base .. path, encoded, HttpContentType.ApplicationJson, headers)
+			if response ~= nil then
+				raw = tostring(response)
+			end
+			if raw ~= "" then
+				used = "post"
+				self.PostMethod = "post"
+			end
+		end
+		if raw == "" then
+			self:ArmHttp()
+			if self.HttpLimited == true then
+				self.HttpBody = ""
+				self:PushStatus("연결 실패: 요청 한도")
+				return
+			end
+			self:Console("POST " .. path .. " begin method=request baseLen=" .. tostring(string.len(base)) .. " tokenLen=" .. tostring(string.len(self.WorldToken)))
+			local response = _HttpService:RequestAndWait(base .. path, "POST", encoded, { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. self.WorldToken })
+			if response ~= nil then
+				raw = tostring(response)
+			end
+			used = "request"
+			if raw ~= "" then
+				self.PostMethod = "request"
+			end
+		end
+		self:RememberSnippet(raw)
+		self:Console("POST " .. path .. " done method=" .. used .. " bodyLen=" .. tostring(string.len(raw)) .. " status=unavailable snippet=" .. self.HttpSnippet)
+		self.HttpBody = raw
+		if raw == "" then
+			self:PushStatus("POST 실패(메이커 HttpService)")
+		end
 	end
 
 	@ExecSpace("ServerOnly")
@@ -354,10 +411,12 @@ script VillageRelay extends Component
 
 	@ExecSpace("ServerOnly")
 	method void SyncClockFromTime()
-		self:PostRelay("/time", "{}")
+		self:GetRelay("/time")
+		if self.HttpBody == "" then
+			self:PostRelay("/time", "{}")
+		end
 		local response = self.HttpBody
 		if response == "" then
-			self:PushStatus("연결 실패: /time 응답 없음")
 			return
 		end
 		local decoded = _HttpService:JSONDecode(response)
@@ -392,7 +451,6 @@ script VillageRelay extends Component
 		end
 		self:PostRelay("/world/refresh", _HttpService:JSONEncode({ refreshToken = self.WorldRefreshToken }))
 		if self.HttpBody == "" then
-			self:PushStatus("연결 실패: 갱신 응답 없음")
 			return
 		end
 		local decoded = _HttpService:JSONDecode(self.HttpBody)
@@ -427,7 +485,10 @@ script VillageRelay extends Component
 		self.PollStartedAt = now
 		self.LastPollAt = now
 		self:MaybeRefresh()
-		self:PostRelay("/state", _HttpService:JSONEncode({ afterEventSeq = self.Cursor }))
+		self:GetRelay("/state?afterEventSeq=" .. tostring(self.Cursor))
+		if self.HttpBody == "" then
+			self:PostRelay("/state", _HttpService:JSONEncode({ afterEventSeq = self.Cursor }))
+		end
 		self.Busy = false
 		local response = self.HttpBody
 		if response == "" then
@@ -436,7 +497,9 @@ script VillageRelay extends Component
 				self.PollInterval = 10
 				self:Console("poll backoff interval=10")
 			end
-			self:PushStatus("연결 실패: 빈 응답")
+			if self.HttpLimited ~= true then
+				self:PushStatus("POST 실패(메이커 HttpService)")
+			end
 			return
 		end
 		self.EmptyPolls = 0

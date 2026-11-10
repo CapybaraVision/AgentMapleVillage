@@ -9,6 +9,17 @@ export class HttpError extends Error {
   }
 }
 
+export async function getJson<T>(url: string, token?: string, fetchImpl: typeof fetch = fetch): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (token) headers.authorization = `Bearer ${token}`;
+  const response = await fetchImpl(url, { method: 'GET', headers });
+  const parsed = (await response.json()) as { ok?: boolean; error?: string; message?: string };
+  if (!response.ok || parsed.ok === false) {
+    throw new HttpError(response.status, parsed.error ?? 'http_error', parsed.message ?? response.statusText, parsed);
+  }
+  return parsed as T;
+}
+
 export async function postJson<T>(
   url: string,
   body: unknown,

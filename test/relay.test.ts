@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { postJson } from '../src/http-client.js';
+import { getJson, postJson } from '../src/http-client.js';
 import { startRelay, type Relay } from '../src/relay.js';
 
 class ManualClock {
@@ -182,5 +182,58 @@ describe('relay auth and routing', () => {
     const recovered = await postJson<{ mode: string; view: { feed: Array<{ text: string }> } }>(`${relay.url}/v1/state`, { afterEventSeq: 1 }, paired.worldToken);
     expect(recovered.mode).toBe('snapshot');
     expect(recovered.view.feed.map((item) => item.text)).toEqual(['n3', 'n4']);
+  });
+
+  it('serves GET /v1/state and GET /v1/time with the same world bearer', async () => {
+    const clock = new ManualClock();
+    const { relay, rootToken } = await boot({ clock });
+    const created = await postJson<{ connectorToken: string; pairingCode: string }>(`${relay.url}/v1/villages`, {}, rootToken);
+    const paired = await postJson<{ worldToken: string }>(`${relay.url}/v1/pair`, { pairingCode: created.pairingCode });
+    const posted = await postJson<{ ok: boolean; mode: string; cursor: number; serverTime: number }>(`${relay.url}/v1/state`, { afterEventSeq: 0 }, paired.worldToken);
+    const got = await getJson<{ ok: boolean; mode: string; cursor: number; serverTime: number }>(`${relay.url}/v1/state?afterEventSeq=0`, paired.worldToken);
+    expect(got).toEqual(posted);
+    const timed = await getJson<{ ok: boolean; serverTime: number; epoch: string }>(`${relay.url}/v1/time`, paired.worldToken);
+    expect(timed).toEqual({ ok: true, serverTime: clock.t, epoch: 'unix-ms' });
+    await expect(getJson(`${relay.url}/v1/state?afterEventSeq=0`)).rejects.toMatchObject({ status: 401 });
+    await expect(getJson(`${relay.url}/v1/time`)).rejects.toMatchObject({ status: 401 });
+    await expect(getJson(`${relay.url}/v1/state?afterEventSeq=0`, created.connectorToken)).rejects.toMatchObject({ status: 403 });
+    await expect(getJson(`${relay.url}/v1/state?afterEventSeq=nope`, paired.worldToken)).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('logs method, path, status, and length without tokens or bodies', async () => {
+    const previous = process.env.RELAY_LOG_REQUESTS;
+    process.env.RELAY_LOG_REQUESTS = '1';
+    const lines: string[] = [];
+    const original = console.log;
+    console.log = (...args: unknown[]) => {
+      lines.push(args.map((item) => String(item)).join(' '));
+    };
+    try {
+      const clock = new ManualClock();
+      const { relay, rootToken } = await boot({ clock });
+      const created = await postJson<{ pairingCode: string }>(`${relay.url}/v1/villages`, {}, rootToken);
+      const paired = await postJson<{ worldToken: string }>(`${relay.url}/v1/pair`, { pairingCode: created.pairingCode });
+      lines.length = 0;
+      await postJson(`${relay.url}/v1/commands`, {
+        commandId: 'goal-log',
+        type: 'goal.submit',
+        issuedAt: clock.now(),
+        payload: { text: 'LEAKCHECK-do-not-log' },
+      }, paired.worldToken);
+      await getJson(`${relay.url}/v1/state?afterEventSeq=0`, paired.worldToken);
+      const httpLines = lines.filter((line) => line.startsWith('http '));
+      expect(httpLines.some((line) => /http method=POST path=\/v1\/commands status=202 bodyLen=\d+ ms=\d+$/.test(line))).toBe(true);
+      expect(httpLines.some((line) => /http method=GET path=\/v1\/state status=200 bodyLen=\d+ ms=\d+$/.test(line))).toBe(true);
+      const joined = httpLines.join('\n');
+      expect(joined).not.toContain(paired.worldToken);
+      expect(joined).not.toContain(rootToken);
+      expect(joined).not.toContain('LEAKCHECK-do-not-log');
+      expect(joined).not.toContain('Bearer');
+      expect(joined).not.toContain('afterEventSeq');
+    } finally {
+      console.log = original;
+      if (previous === undefined) delete process.env.RELAY_LOG_REQUESTS;
+      else process.env.RELAY_LOG_REQUESTS = previous;
+    }
   });
 });

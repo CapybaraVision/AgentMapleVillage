@@ -140,6 +140,8 @@ export class Relay {
   }
 
   private async handle(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+    const started = Date.now();
+    attachRequestLog(req, res, started);
     try {
       const method = req.method ?? 'GET';
       if (method !== 'GET' && method !== 'POST') {
@@ -152,7 +154,8 @@ export class Relay {
         send(res, 200, { ok: true, service: 'agentmaple-relay', protocol: 1 });
         return;
       }
-      if (path === '/v1/time' && method === 'POST') return this.time(req, res);
+      if (path === '/v1/time' && (method === 'GET' || method === 'POST')) return this.time(req, res);
+      if (path === '/v1/state' && method === 'GET') return this.stateGet(req, res, url);
       if (method !== 'POST') {
         send(res, 404, { ok: false, error: 'not_found', message: 'unknown route' });
         return;
@@ -361,11 +364,22 @@ export class Relay {
     send(res, 200, { ok: true, cursor: village.eventSeq, accepted });
   }
 
+  private stateGet(req: http.IncomingMessage, res: http.ServerResponse, url: URL): void {
+    const raw = url.searchParams.get('afterEventSeq');
+    const after = raw == null || raw === '' ? 0 : Number(raw);
+    if (!Number.isInteger(after) || after < 0) fail(400, 'bad_request', 'afterEventSeq must be a non-negative integer');
+    this.writeState(req, res, after);
+  }
+
   private state(req: http.IncomingMessage, res: http.ServerResponse, body: unknown): void {
-    const village = this.requireRole(req, 'world');
     const record = asRecord(body);
     const after = typeof record.afterEventSeq === 'number' ? record.afterEventSeq : 0;
     if (!Number.isInteger(after) || after < 0) fail(400, 'bad_request', 'afterEventSeq must be a non-negative integer');
+    this.writeState(req, res, after);
+  }
+
+  private writeState(req: http.IncomingMessage, res: http.ServerResponse, after: number): void {
+    const village = this.requireRole(req, 'world');
     const oldest = village.events[0]?.eventSeq ?? 0;
     const gap = after > 0 && oldest > 0 && after + 1 < oldest;
     const snapshot = after === 0 || gap;
@@ -436,12 +450,29 @@ function fail(status: number, code: string, message: string): never {
 
 function send(res: http.ServerResponse, status: number, body: unknown): void {
   const json = JSON.stringify(body);
+  const bodyLen = Buffer.byteLength(json);
   res.writeHead(status, {
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store',
-    'content-length': Buffer.byteLength(json),
+    'content-length': bodyLen,
   });
+  const logged = res as http.ServerResponse & { logHttp?: (status: number, bodyLen: number) => void };
+  logged.logHttp?.(status, bodyLen);
   res.end(json);
+}
+
+function attachRequestLog(req: http.IncomingMessage, res: http.ServerResponse, started: number): void {
+  if (process.env.RELAY_LOG_REQUESTS !== '1') return;
+  const method = req.method ?? 'GET';
+  let pathName = '/';
+  try {
+    pathName = new URL(req.url ?? '/', 'http://relay.local').pathname;
+  } catch {
+    pathName = '/';
+  }
+  (res as http.ServerResponse & { logHttp?: (status: number, bodyLen: number) => void }).logHttp = (status, bodyLen) => {
+    console.log(`http method=${method} path=${pathName} status=${status} bodyLen=${bodyLen} ms=${Date.now() - started}`);
+  };
 }
 
 async function readBody(req: http.IncomingMessage): Promise<unknown> {

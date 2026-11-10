@@ -25,6 +25,7 @@ const relay = await startRelay({
 
 console.log(`agentmaple relay listening on ${relay.url}`);
 console.log(`stateFile=${file}`);
+console.log(`requestLog=${process.env.RELAY_LOG_REQUESTS === '1' ? 'on' : 'off'}`);
 console.log('World tokens default to 30 days. Refresh tokens default to 90 days. Restart this process after replacing the code, with the same state file, so the village and characters stay.');
 console.log('TLS on port 443 belongs in front of this process. MapleStory Worlds should call the public https endpoint.');
 console.log('This process does not execute shell, git, or desktop commands.');

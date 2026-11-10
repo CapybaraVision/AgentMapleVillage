@@ -31,6 +31,8 @@ npm run typecheck
 $env:RELAY_ROOT_TOKEN = "<이 창에서만 정한 16자 이상. 채팅에 붙여 넣지 말 것>"
 $env:RELAY_HOST = "127.0.0.1"
 $env:RELAY_PORT = "8787"
+$env:RELAY_STATE_FILE = "C:\Users\pop49\.agentmaple\relay-state.json"
+$env:RELAY_LOG_REQUESTS = "1"
 npx tsx src/bin/relay.ts
 ```
 

@@ -72,7 +72,12 @@ describe('msw script contract', () => {
     const withoutComments = all.replace(/--\[\[[\s\S]*?\]\]/g, '').replace(/--.*$/gm, '');
     expect(withoutComments).not.toMatch(/method\s+\S+\s+\w+\s*\([^)]*\bany\s+/);
     const code = all.replace(/--\[\[[\s\S]*?\]\]/g, '').replace(/--.*$/gm, '');
-    expect(code).not.toMatch(/WebSocket|websocket|os\.execute|io\.popen|RequestAndWait|RUID|\.modpackage/);
+    expect(code).not.toMatch(/WebSocket|websocket|os\.execute|io\.popen|RUID|\.modpackage/);
+    expect(relay).toContain('RequestAndWait');
+    expect(relay).toContain('method=post');
+    expect(relay).toContain('method=request');
+    expect(relay).toContain('/state?afterEventSeq=');
+    expect(relay).toContain('POST 실패(메이커 HttpService)');
     expect(all).toContain('UNVERIFIED');
   });
 
