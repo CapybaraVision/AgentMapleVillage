@@ -14,7 +14,8 @@ import { systemClock } from './office.js';
 
 const SKEW_MS = 5 * 60 * 1000;
 const PAIRING_TTL_MS = 10 * 60 * 1000;
-const WORLD_TTL_MS = 24 * 60 * 60 * 1000;
+const WORLD_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const REFRESH_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const MAX_BODY = 256 * 1024;
 const MAX_EVENTS = 500;
 
@@ -26,6 +27,7 @@ export interface RelayOptions {
   file?: string;
   pairingTtlMs?: number;
   worldTtlMs?: number;
+  refreshTtlMs?: number;
   skewMs?: number;
   maxEvents?: number;
 }
@@ -59,7 +61,7 @@ interface Village {
   displayName: string;
   connectorTokenHash: string;
   pairing?: { codeHash: string; expiresAt: number; used: boolean };
-  world?: { tokenHash: string; refreshHash: string; expiresAt: number };
+  world?: { tokenHash: string; refreshHash: string; expiresAt: number; refreshExpiresAt?: number };
   revokedRefresh: string[];
   commands: StoredCommand[];
   commandSeq: number;
@@ -159,6 +161,7 @@ export class Relay {
       if (path === '/v1/villages') return this.createVillage(req, res, body);
       if (path === '/v1/pair') return this.pair(res, body);
       if (path === '/v1/world/refresh') return this.refresh(res, body);
+      if (path === '/v1/world/reissue') return this.reissue(req, res, body);
       if (path === '/v1/commands') return this.enqueue(req, res, body);
       if (path === '/v1/connector/poll') return this.poll(req, res, body);
       if (path === '/v1/events') return this.ingest(req, res, body);
@@ -240,7 +243,8 @@ export class Relay {
       fail(401, 'replay', 'refresh token was already used');
     }
     const now = this.clock.now();
-    if (village.world.expiresAt <= now) fail(401, 'expired', 'refresh token is expired');
+    const refreshExpiresAt = village.world.refreshExpiresAt ?? village.world.expiresAt;
+    if (refreshExpiresAt <= now) fail(401, 'expired', 'refresh token is expired');
     this.tokens.delete(village.world.tokenHash);
     village.revokedRefresh.push(hash);
     const issued = this.issueWorld(village, now);
@@ -248,13 +252,33 @@ export class Relay {
     send(res, 200, { ok: true, villageId: village.id, ...issued });
   }
 
-  private issueWorld(village: Village, now: number): { worldToken: string; worldTokenExpiresAt: number; refreshToken: string } {
+  private reissue(req: http.IncomingMessage, res: http.ServerResponse, body: unknown): void {
+    this.requireRoot(req);
+    const record = asRecord(body);
+    const requested = typeof record.villageId === 'string' ? record.villageId : '';
+    const villages = [...this.villages.values()];
+    const village = requested ? this.villages.get(requested) : villages.length === 1 ? villages[0] : undefined;
+    if (!village) fail(404, 'not_found', requested ? 'village was not found' : 'villageId is required');
+    if (village.world) {
+      this.tokens.delete(village.world.tokenHash);
+      village.revokedRefresh.push(village.world.refreshHash);
+    }
+    const issued = this.issueWorld(village, this.clock.now());
+    this.persist();
+    send(res, 200, { ok: true, villageId: village.id, serverTime: this.clock.now(), ...issued });
+  }
+
+  private issueWorld(village: Village, now: number): { worldToken: string; worldTokenExpiresAt: number; refreshToken: string; refreshTokenExpiresAt: number } {
     const worldToken = randomToken('amv_world');
     const refreshToken = randomToken('amv_refresh');
-    const expiresAt = now + (this.opts.worldTtlMs ?? WORLD_TTL_MS);
-    village.world = { tokenHash: sha256(worldToken), refreshHash: sha256(refreshToken), expiresAt };
+    const worldTtl = this.opts.worldTtlMs ?? WORLD_TTL_MS;
+    let refreshTtl = this.opts.refreshTtlMs ?? REFRESH_TTL_MS;
+    if (refreshTtl <= worldTtl) refreshTtl = worldTtl + 24 * 60 * 60 * 1000;
+    const expiresAt = now + worldTtl;
+    const refreshExpiresAt = now + refreshTtl;
+    village.world = { tokenHash: sha256(worldToken), refreshHash: sha256(refreshToken), expiresAt, refreshExpiresAt };
     this.tokens.set(village.world.tokenHash, { villageId: village.id, role: 'world' });
-    return { worldToken, worldTokenExpiresAt: expiresAt, refreshToken };
+    return { worldToken, worldTokenExpiresAt: expiresAt, refreshToken, refreshTokenExpiresAt: refreshExpiresAt };
   }
 
   private enqueue(req: http.IncomingMessage, res: http.ServerResponse, body: unknown): void {

@@ -352,7 +352,7 @@ describe('Basic workspace deploy', () => {
       jsonString: {
         name: 'VillageRelay',
         path: '/maps/map01/VillageRelay',
-        '@components': [{ '@type': 'script.VillageRelay', Enable: true, RelayBase: 'https://tunnel.example/v1', WorldToken: 'keep-token', ShowDebug: true }],
+        '@components': [{ '@type': 'script.VillageRelay', Enable: true, RelayBase: 'https://tunnel.example/v1', WorldToken: 'keep-token', WorldRefreshToken: 'keep-refresh', LocalRelayBase: 'http://127.0.0.1:8787/v1', ShowDebug: true }],
       },
     });
     fs.writeFileSync(path.join(workspace, 'map/map01.map'), JSON.stringify(map));
@@ -363,6 +363,8 @@ describe('Basic workspace deploy', () => {
     const relay = written.ContentProto.Entities.find((entity) => entity.path === '/maps/map01/VillageRelay')?.jsonString?.['@components']?.find((component) => component['@type'] === 'script.VillageRelay');
     expect(relay?.RelayBase).toBe('https://tunnel.example/v1');
     expect(relay?.WorldToken).toBe('keep-token');
+    expect(relay?.WorldRefreshToken).toBe('keep-refresh');
+    expect(relay?.LocalRelayBase).toBe('http://127.0.0.1:8787/v1');
     expect(relay?.ShowDebug).toBe(true);
     const foreman = written.ContentProto.Entities.find((entity) => entity.path === '/maps/map01/Foreman')?.jsonString?.['@components'];
     expect(foreman?.some((component) => component['@type'] === 'MOD.Core.AvatarRendererComponent')).toBe(true);
@@ -390,6 +392,8 @@ describe('Basic workspace deploy', () => {
     const againRelay = again.ContentProto.Entities.find((entity) => entity.path === '/maps/map01/VillageRelay')?.jsonString?.['@components']?.find((component) => component['@type'] === 'script.VillageRelay');
     expect(againRelay?.RelayBase).toBe('https://tunnel.example/v1');
     expect(againRelay?.WorldToken).toBe('keep-token');
+    expect(againRelay?.WorldRefreshToken).toBe('keep-refresh');
+    expect(againRelay?.LocalRelayBase).toBe('http://127.0.0.1:8787/v1');
     const againPortal = again.ContentProto.Entities.find((entity) => entity.path === '/maps/map01/PortalLibrary')?.jsonString?.['@components']?.find((component) => component['@type'] === 'MOD.Core.PortalComponent');
     expect(againPortal?.IsLegacy).toBe(false);
     expect(againPortal?.TargetPortal).toBe('keep-ref');

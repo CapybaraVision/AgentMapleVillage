@@ -20,6 +20,8 @@
 12. 폴링은 2초입니다. 월드의 다른 HttpService 호출과 합쳐 분당 120회를 넘기지 마세요. 넘기면 문서상 30초간 요청이 멈춥니다.
 13. HttpService의 `GetAndWait`, `PostAndWait`, `RequestAndWait`는 서버 전용입니다. 이 스크립트의 폴링은 `@ExecSpace("ServerOnly")`입니다. 공식 HttpService 페이지의 `httpEnabled`는 `http://`만 허용하는 스위치이고 기본값은 거짓입니다. 릴레이가 `https://`이면 이 스위치를 켜지 않아도 됩니다. 그 페이지에는 도메인 허용 목록이 없습니다.
 14. 포탈은 연결할 맵마다 두고, 프로퍼티 에디터에서 TargetPortal의 [◉]를 누른 뒤 Reference 창에서 반대편 포탈을 고릅니다. 출발과 도착을 서로 지정합니다. 파일에 들어 있는 참조 JSON 예제는 없어서 배포는 TargetPortal을 비워 둡니다. `IsLegacy`는 false로 씁니다.
+15. 메이커 테스트 플레이(`Environment:IsPublishedPlay()`가 거짓)는 `LocalRelayBase`(기본 `http://127.0.0.1:8787/v1`)를 쓰고 `httpEnabled`를 켭니다. `127.0.0.1`의 `/health`가 비면 `localhost`로 한 번 더 봅니다. 출시 플레이는 `RelayBase`의 https를 그대로 씁니다. 이 `Environment` 호출은 커뮤니티 예제에 있고, 이 저장소의 문서 팩에는 없습니다.
+16. 월드 토큰 기본 수명은 30일, 갱신 토큰은 90일입니다. 코드를 바꾼 뒤에는 같은 `RELAY_STATE_FILE`로 릴레이를 다시 켜야 새 수명이 적용됩니다. 그 파일에 마을과 캐릭터 기록이 있으므로 경로를 바꾸면 빈 마을이 됩니다. 재시작만으로 이미 만료된 토큰이 길어지지는 않습니다. 이어서 `node tools/mint-world-token.mjs`로 다시 발급합니다.
 
 ## 도서관과 바닥
 

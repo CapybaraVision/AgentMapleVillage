@@ -55,6 +55,12 @@ describe('msw script contract', () => {
     expect(relay).toContain('연결 실패:');
     expect(relay).toContain('연결됨');
     expect(relay).toContain('WorldTokenLen=');
+    expect(relay).toContain('LocalRelayBase');
+    expect(relay).toContain('httpEnabled = true');
+    expect(relay).toContain('GetAndWait');
+    expect(relay).toContain('/health');
+    expect(relay).toContain('poll backoff interval=10');
+    expect(relay).toContain('WorldRefreshToken');
     expect(relay).not.toContain('OnBeginPlay clears it');
     expect(npc).not.toContain('if self.OwnerUserId == "" then\n\t\t\tself.OwnerUserId = event.UserId');
     expect(hall).not.toContain('documentVersion');

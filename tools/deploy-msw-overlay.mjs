@@ -50,6 +50,7 @@ const SCRIPT_PROPERTY_DEFAULTS = {
     Busy: false,
     Cursor: 0,
     CommandCounter: 0,
+    LocalRelayBase: 'http://127.0.0.1:8787/v1',
   },
 };
 

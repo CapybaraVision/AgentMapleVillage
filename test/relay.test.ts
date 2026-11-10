@@ -115,7 +115,20 @@ describe('relay auth and routing', () => {
 
     clock.t += 5_001;
     await expect(postJson(`${relay.url}/v1/state`, { afterEventSeq: 0 }, rotated.worldToken)).rejects.toMatchObject({ status: 401, code: 'expired' });
-    await expect(postJson(`${relay.url}/v1/world/refresh`, { refreshToken: rotated.refreshToken })).rejects.toMatchObject({ status: 401, code: 'expired' });
+    const extended = await postJson<{ worldToken: string; refreshToken: string }>(`${relay.url}/v1/world/refresh`, { refreshToken: rotated.refreshToken });
+    const alive = await postJson<{ ok: boolean }>(`${relay.url}/v1/state`, { afterEventSeq: 0 }, extended.worldToken);
+    expect(alive.ok).toBe(true);
+    clock.t += 90 * 24 * 60 * 60 * 1000 + 1;
+    await expect(postJson(`${relay.url}/v1/world/refresh`, { refreshToken: extended.refreshToken })).rejects.toMatchObject({ status: 401, code: 'expired' });
+  });
+
+  it('issues a 30 day world token and a longer refresh token', async () => {
+    const clock = new ManualClock();
+    const { relay, rootToken } = await boot({ clock });
+    const created = await postJson<{ pairingCode: string }>(`${relay.url}/v1/villages`, {}, rootToken);
+    const paired = await postJson<{ worldTokenExpiresAt: number; refreshTokenExpiresAt: number }>(`${relay.url}/v1/pair`, { pairingCode: created.pairingCode });
+    expect(paired.worldTokenExpiresAt - clock.t).toBe(30 * 24 * 60 * 60 * 1000);
+    expect(paired.refreshTokenExpiresAt - clock.t).toBe(90 * 24 * 60 * 60 * 1000);
   });
 
   it('isolates villages and dedupes events across a restart', async () => {

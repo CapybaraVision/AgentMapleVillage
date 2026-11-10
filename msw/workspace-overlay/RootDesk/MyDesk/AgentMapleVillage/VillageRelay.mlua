@@ -3,14 +3,16 @@
   Paste into a server Script component named VillageRelay. This is not a .modpackage.
   No Nexon/Maple art, RUID, or audio is included. Unofficial; not affiliated with Nexon.
 
-  HttpService notes checked against Creator Center HttpService (postId 805):
-  server-only, PostAndWait/GetAndWait, TLS, port 443. The notice says only GET/POST
-  are supported, so this script uses PostAndWait only.
+  HttpService notes checked against Creator Center HttpService:
+  server-only GetAndWait and PostAndWait. httpEnabled allows http:// and defaults false.
+  Unpublished Maker play uses LocalRelayBase. Published play uses RelayBase.
 ]]
 
 @Component
 script VillageRelay extends Component
 	property string RelayBase = "https://relay.example/v1"
+	property string LocalRelayBase = "http://127.0.0.1:8787/v1"
+	property string ActiveBase = ""
 	property string GoalDeskPath = "/ui/AgentMapleDesk/GoalDesk"
 	property string LibraryHallPath = "/ui/AgentMapleLibrary/LibraryHall"
 	property string ForemanNpcPath = "/maps/AgentMapleVillage/Foreman"
@@ -27,6 +29,8 @@ script VillageRelay extends Component
 	-- Declared because an undeclared self field raises "cannot set Name, no such field".
 	-- Not @Sync. OnBeginPlay does not clear a token saved on the map.
 	property string WorldToken = ""
+	property string WorldRefreshToken = ""
+	property number WorldTokenExpiresAt = 0
 	property any ClockOffset = nil
 	property string OpenDecisionId = ""
 	property string OpenBookId = ""
@@ -41,6 +45,15 @@ script VillageRelay extends Component
 	property number PollStartedAt = 0
 	property string HttpBody = ""
 	property string HttpSnippet = ""
+	property number EmptyPolls = 0
+	property number PollInterval = 2
+	property number LastPollAt = 0
+	property number LastRefreshAt = 0
+	property number HttpCount = 0
+	property number HttpWindowStart = 0
+	property boolean HttpLimited = false
+	property boolean RefreshOk = false
+	property boolean PollRetry = false
 	@ExecSpace("ServerOnly")
 	method void OnBeginPlay()
 		self.ClockOffset = nil
@@ -54,6 +67,12 @@ script VillageRelay extends Component
 		self.PollStartedAt = 0
 		self.ForemanStation = "home"
 		self.WorkerStation = "home"
+		self.EmptyPolls = 0
+		self.PollInterval = 2
+		self.LastPollAt = 0
+		self.LastRefreshAt = 0
+		self.HttpCount = 0
+		self.HttpWindowStart = 0
 		self:HideEmptyAnchors()
 		self:PlaceActors()
 		local https = "false"
@@ -61,6 +80,7 @@ script VillageRelay extends Component
 			https = "true"
 		end
 		self:Console("startup RelayBaseLen=" .. tostring(string.len(self.RelayBase)) .. " WorldTokenLen=" .. tostring(string.len(self.WorldToken)) .. " https=" .. https)
+		self:ChooseBase()
 		local tick = function()
 			if self.Busy == true then
 				local age = DateTime.UtcNow.Elapsed - self.PollStartedAt
@@ -73,10 +93,92 @@ script VillageRelay extends Component
 			end
 			self:Poll()
 		end
-		-- 2 seconds -> 30 requests/minute, under the documented 120/minute quota.
+		-- 2 seconds is 30 requests/minute. Empty replies back off to 10 seconds. Hard stop at 100/minute.
 		_TimerService:SetTimerRepeat(tick, 2)
 		self:Console("poll loop started interval=2")
 		self:Poll()
+	end
+
+	@ExecSpace("ServerOnly")
+	method void ChooseBase()
+		local published = false
+		if Environment ~= nil then
+			published = Environment:IsPublishedPlay() == true
+		end
+		if published == true then
+			self.ActiveBase = self.RelayBase
+			self:LogBase("public")
+			self:ProbeHealth()
+			return
+		end
+		_HttpService.httpEnabled = true
+		self.ActiveBase = self.LocalRelayBase
+		self:LogBase("local")
+		self:ProbeHealth()
+		if self.HttpBody == "" and string.sub(self.ActiveBase, 1, 16) == "http://127.0.0.1" then
+			self.ActiveBase = "http://localhost" .. string.sub(self.ActiveBase, 17)
+			self:LogBase("localhost")
+			self:ProbeHealth()
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void LogBase(string which)
+		local scheme = "other"
+		if string.sub(self.ActiveBase, 1, 8) == "https://" then
+			scheme = "https"
+		elseif string.sub(self.ActiveBase, 1, 7) == "http://" then
+			scheme = "http"
+		end
+		self:Console("base=" .. which .. " scheme=" .. scheme .. " baseLen=" .. tostring(string.len(self.ActiveBase)))
+	end
+
+	@ExecSpace("ServerOnly")
+	method void ProbeHealth()
+		self:ArmHttp()
+		if self.HttpLimited == true then
+			self.HttpBody = ""
+			self:PushStatus("연결 실패: 요청 한도")
+			return
+		end
+		local base = self.ActiveBase
+		if base == "" then
+			base = self.RelayBase
+		end
+		self:Console("GET /health begin baseLen=" .. tostring(string.len(base)))
+		local response = _HttpService:GetAndWait(base .. "/health", { ["Accept"] = "application/json" })
+		local raw = ""
+		if response ~= nil then
+			raw = tostring(response)
+		end
+		self.HttpBody = raw
+		local snippet = raw
+		if string.len(snippet) > 120 then
+			snippet = string.sub(snippet, 1, 120)
+		end
+		self.HttpSnippet = snippet
+		self:Console("GET /health done bodyLen=" .. tostring(string.len(raw)) .. " snippet=" .. snippet)
+		if raw == "" then
+			self:PushStatus("연결 실패: /health 응답 없음")
+		else
+			self:PushStatus("연결 확인: " .. snippet)
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void ArmHttp()
+		local now = DateTime.UtcNow.Elapsed
+		if self.HttpWindowStart == 0 or now - self.HttpWindowStart >= 60000 then
+			self.HttpWindowStart = now
+			self.HttpCount = 0
+		end
+		if self.HttpCount >= 100 then
+			self.HttpLimited = true
+			self:Console("http budget skip count=" .. tostring(self.HttpCount))
+			return
+		end
+		self.HttpLimited = false
+		self.HttpCount = self.HttpCount + 1
 	end
 
 	@ExecSpace("ServerOnly")
@@ -119,6 +221,12 @@ script VillageRelay extends Component
 			return
 		end
 		self.WorldToken = decoded.worldToken
+		if decoded.refreshToken ~= nil then
+			self.WorldRefreshToken = decoded.refreshToken
+		end
+		if decoded.worldTokenExpiresAt ~= nil then
+			self.WorldTokenExpiresAt = decoded.worldTokenExpiresAt
+		end
 		-- Elapsed is documented as milliseconds, not as Unix epoch.
 		-- serverTime is the relay's Unix millisecond clock. The difference is the offset.
 		if decoded.serverTime ~= nil then
@@ -201,7 +309,11 @@ script VillageRelay extends Component
 		if self.WorldToken ~= "" then
 			snippet = string.gsub(snippet, self.WorldToken, "redacted")
 		end
+		if self.WorldRefreshToken ~= "" then
+			snippet = string.gsub(snippet, self.WorldRefreshToken, "redacted")
+		end
 		snippet = string.gsub(snippet, [["worldToken"%s*:%s*"[^"]*"]], [["worldToken":"redacted"]])
+		snippet = string.gsub(snippet, [["refreshToken"%s*:%s*"[^"]*"]], [["refreshToken":"redacted"]])
 		snippet = string.gsub(snippet, "Bearer [^%s\"]+", "Bearer redacted")
 		if string.len(snippet) > 180 then
 			snippet = string.sub(snippet, 1, 180)
@@ -212,9 +324,19 @@ script VillageRelay extends Component
 	@ExecSpace("ServerOnly")
 	method void PostRelay(string path, string encoded)
 		-- PostAndWait returns the body only. The HttpService page has no status code.
+		self:ArmHttp()
+		if self.HttpLimited == true then
+			self.HttpBody = ""
+			self:PushStatus("연결 실패: 요청 한도")
+			return
+		end
+		local base = self.ActiveBase
+		if base == "" then
+			base = self.RelayBase
+		end
 		local headers = { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. self.WorldToken }
-		self:Console("POST " .. path .. " begin baseLen=" .. tostring(string.len(self.RelayBase)) .. " tokenLen=" .. tostring(string.len(self.WorldToken)))
-		local response = _HttpService:PostAndWait(self.RelayBase .. path, encoded, HttpContentType.ApplicationJson, headers)
+		self:Console("POST " .. path .. " begin baseLen=" .. tostring(string.len(base)) .. " tokenLen=" .. tostring(string.len(self.WorldToken)))
+		local response = _HttpService:PostAndWait(base .. path, encoded, HttpContentType.ApplicationJson, headers)
 		local raw = ""
 		if response ~= nil then
 			raw = tostring(response)
@@ -247,8 +369,53 @@ script VillageRelay extends Component
 	end
 
 	@ExecSpace("ServerOnly")
+	method void MaybeRefresh()
+		if self.WorldRefreshToken == "" or self.ClockOffset == nil or self.WorldTokenExpiresAt <= 0 then
+			return
+		end
+		local now = DateTime.UtcNow.Elapsed + self.ClockOffset
+		if now < self.WorldTokenExpiresAt - 86400000 then
+			return
+		end
+		if self.LastRefreshAt > 0 and DateTime.UtcNow.Elapsed - self.LastRefreshAt < 600000 then
+			return
+		end
+		self:RefreshWorld()
+	end
+
+	@ExecSpace("ServerOnly")
+	method void RefreshWorld()
+		self.LastRefreshAt = DateTime.UtcNow.Elapsed
+		self.RefreshOk = false
+		if self.WorldRefreshToken == "" then
+			return
+		end
+		self:PostRelay("/world/refresh", _HttpService:JSONEncode({ refreshToken = self.WorldRefreshToken }))
+		if self.HttpBody == "" then
+			self:PushStatus("연결 실패: 갱신 응답 없음")
+			return
+		end
+		local decoded = _HttpService:JSONDecode(self.HttpBody)
+		if decoded == nil or decoded.worldToken == nil or decoded.refreshToken == nil then
+			self:PushStatus("연결 실패: 갱신 실패")
+			return
+		end
+		self.WorldToken = decoded.worldToken
+		self.WorldRefreshToken = decoded.refreshToken
+		if decoded.worldTokenExpiresAt ~= nil then
+			self.WorldTokenExpiresAt = decoded.worldTokenExpiresAt
+		end
+		self.RefreshOk = true
+		self:Console("world token refreshed tokenLen=" .. tostring(string.len(self.WorldToken)))
+	end
+
+	@ExecSpace("ServerOnly")
 	method void Poll()
 		if self.Busy == true then
+			return
+		end
+		local now = DateTime.UtcNow.Elapsed
+		if self.LastPollAt > 0 and now - self.LastPollAt < self.PollInterval * 1000 then
 			return
 		end
 		if self.WorldToken == "" then
@@ -257,24 +424,44 @@ script VillageRelay extends Component
 			return
 		end
 		self.Busy = true
-		self.PollStartedAt = DateTime.UtcNow.Elapsed
+		self.PollStartedAt = now
+		self.LastPollAt = now
+		self:MaybeRefresh()
 		self:PostRelay("/state", _HttpService:JSONEncode({ afterEventSeq = self.Cursor }))
 		self.Busy = false
 		local response = self.HttpBody
 		if response == "" then
+			self.EmptyPolls = self.EmptyPolls + 1
+			if self.EmptyPolls >= 2 then
+				self.PollInterval = 10
+				self:Console("poll backoff interval=10")
+			end
 			self:PushStatus("연결 실패: 빈 응답")
 			return
 		end
+		self.EmptyPolls = 0
+		self.PollInterval = 2
 		local decoded = _HttpService:JSONDecode(response)
 		if decoded == nil then
 			self:PushStatus("연결 실패: JSON이 아님")
 			return
 		end
 		if decoded.ok == false then
+			if self.PollRetry ~= true and tostring(decoded.error) == "expired" then
+				self.PollRetry = true
+				self:RefreshWorld()
+				if self.RefreshOk == true then
+					self.LastPollAt = 0
+					self:Poll()
+					return
+				end
+			end
+			self.PollRetry = false
 			local reason = decoded.message or decoded.error or "거부"
 			self:PushStatus("연결 실패: " .. tostring(reason))
 			return
 		end
+		self.PollRetry = false
 		if decoded.serverTime ~= nil then
 			self:NoteServerTime(decoded.serverTime)
 		else
