@@ -742,7 +742,7 @@ script VillageRelay extends Component
 		end
 	end
 
-	@ExecSpace("ClientOnly")
+	@ExecSpace("Client")
 	method void OpenAnswerPanel()
 		local desk = _EntityService:GetEntityByPath(self.GoalDeskPath)
 		if desk ~= nil and desk.GoalDesk ~= nil then
@@ -1059,7 +1059,7 @@ script VillageRelay extends Component
 		self:SendCommand(commandId, commandType, { meetingId = meetingId })
 	end
 
-	@ExecSpace("ClientOnly")
+	@ExecSpace("Client")
 	method void PushLibrary(string text)
 		-- UI entities exist on the client. postId 1154: do not look up /ui from the server.
 		local hall = _EntityService:GetEntityByPath(self.LibraryHallPath)
@@ -1068,7 +1068,7 @@ script VillageRelay extends Component
 		end
 	end
 
-	@ExecSpace("ClientOnly")
+	@ExecSpace("Client")
 	method void PushUi(string kind, string text)
 		local desk = _EntityService:GetEntityByPath(self.GoalDeskPath)
 		if desk == nil or desk.GoalDesk == nil then

@@ -103,7 +103,7 @@
             },
             {
               "@type": "MOD.Core.CanvasGroupComponent",
-              "BlocksRaycasts": false,
+              "BlocksRaycasts": true,
               "GroupAlpha": 1,
               "Interactable": true,
               "Enable": true
@@ -149,7 +149,7 @@
               },
               "MobileOnly": false,
               "OffsetMax": {
-                "x": 184,
+                "x": 304,
                 "y": 344
               },
               "OffsetMin": {
@@ -161,7 +161,7 @@
                 "y": 0.5
               },
               "RectSize": {
-                "x": 160,
+                "x": 280,
                 "y": 88
               },
               "UIMode": 1,

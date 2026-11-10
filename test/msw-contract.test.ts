@@ -98,4 +98,40 @@ describe('msw script contract', () => {
     expect(desk).toContain('공개 릴레이가 없습니다.');
     expect(desk).not.toContain('마을 연결 전');
   });
+
+  it('lets child UI receive clicks and writes the GUI text component before any legacy text component', () => {
+    const uiDir = path.resolve(root, '..', 'workspace-overlay', 'ui');
+    const uiFiles = fs.readdirSync(uiDir).filter((file) => file.endsWith('.ui'));
+    expect(uiFiles.length).toBeGreaterThan(0);
+    for (const file of uiFiles) {
+      const ui = JSON.parse(fs.readFileSync(path.join(uiDir, file), 'utf8')) as {
+        ContentProto?: { Entities?: Array<{ jsonString?: { path?: string; '@components'?: Array<Record<string, unknown>> } }> };
+      };
+      const rootPath = `/ui/${file.replace(/\.ui$/, '')}`;
+      const rootEntity = (ui.ContentProto?.Entities ?? []).find((entity) => entity.jsonString?.path === rootPath);
+      const canvas = rootEntity?.jsonString?.['@components']?.find((component) => component['@type'] === 'MOD.Core.CanvasGroupComponent');
+      expect(canvas?.BlocksRaycasts, file).toBe(true);
+    }
+    const relay = fs.readFileSync(path.join(root, 'VillageRelay.mlua'), 'utf8');
+    expect(relay).toContain('@ExecSpace("Client")\n\tmethod void PushUi');
+    expect(relay).toContain('@ExecSpace("Client")\n\tmethod void PushLibrary');
+    expect(relay).toContain('@ExecSpace("Client")\n\tmethod void OpenAnswerPanel');
+    expect(relay).toContain('@ExecSpace("ServerOnly")\n\tmethod void PushStatus');
+    for (const file of ['GoalDesk.mlua', 'LibraryHall.mlua']) {
+      const text = fs.readFileSync(path.join(root, file), 'utf8');
+      const writeAt = text.indexOf('method void WriteText');
+      const write = text.slice(writeAt);
+      const guiWrite = write.indexOf('entity.TextGUIRendererComponent.Text = text');
+      const legacyWrite = write.indexOf('entity.TextComponent.Text = text');
+      const leaveGui = write.indexOf('return', guiWrite);
+      expect(guiWrite, file).toBeGreaterThan(-1);
+      expect(leaveGui, file).toBeGreaterThan(guiWrite);
+      expect(legacyWrite, file).toBeGreaterThan(leaveGui);
+      const readAt = text.indexOf('method string ReadText');
+      const read = text.slice(readAt, writeAt);
+      expect(read.indexOf('TextGUIRendererInputComponent')).toBeLessThan(read.indexOf('TextInputComponent'));
+      expect(text).toContain('entity:SetEnable(enabled)');
+    }
+    expect(fs.readFileSync(path.join(root, 'GoalDesk.mlua'), 'utf8')).toContain('지휘석 · 연결됨');
+  });
 });

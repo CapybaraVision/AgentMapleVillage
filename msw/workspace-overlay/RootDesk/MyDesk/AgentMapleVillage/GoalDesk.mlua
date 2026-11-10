@@ -7,6 +7,7 @@
 @Component
 script GoalDesk extends Component
 	property string RelayPath = "/maps/AgentMapleVillage/VillageRelay"
+	property string OpenButtonPath = "/ui/AgentMapleDesk/OpenButton"
 	property string GoalInputPath = "/ui/AgentMapleDesk/Board/GoalInput"
 	property string PairInputPath = "/ui/AgentMapleDesk/Board/PairInput"
 	property string StatusTextPath = "/ui/AgentMapleDesk/Board/StatusText"
@@ -32,6 +33,7 @@ script GoalDesk extends Component
 	method void OnBeginPlay()
 		self:SetEnabled(self.BoardPath, false)
 		self:WriteText(self.StatusTextPath, "공개 릴레이가 없습니다.")
+		self:WriteText(self.OpenButtonPath, "지휘석 · 연결 실패")
 		self:WriteText(self.QuestionTextPath, "질문이 오면 여기에 표시됩니다.")
 		self:WriteText(self.ResultTextPath, "")
 		if self.OpenButton ~= nil and self.OpenButton.Entity ~= nil then
@@ -118,7 +120,7 @@ script GoalDesk extends Component
 	method void SetEnabled(string entityPath, boolean enabled)
 		local entity = _EntityService:GetEntityByPath(entityPath)
 		if entity ~= nil then
-			entity.Enable = enabled
+			entity:SetEnable(enabled)
 		end
 	end
 
@@ -126,6 +128,7 @@ script GoalDesk extends Component
 	method void ShowFromServer(string kind, string text)
 		if kind == "status" then
 			self:WriteText(self.StatusTextPath, text)
+			self:WriteText(self.OpenButtonPath, self:StatusLabel(text))
 		elseif kind == "question" then
 			self:WriteText(self.QuestionTextPath, text)
 		elseif kind == "result" then
@@ -172,16 +175,43 @@ script GoalDesk extends Component
 	@ExecSpace("ClientOnly")
 	method string ReadText(string entityPath)
 		local entity = _EntityService:GetEntityByPath(entityPath)
-		if entity == nil or entity.TextInputComponent == nil then
+		if entity == nil then
 			return ""
 		end
-		return entity.TextInputComponent.Text or ""
+		if entity.TextGUIRendererInputComponent ~= nil then
+			return entity.TextGUIRendererInputComponent.Text or ""
+		end
+		if entity.TextInputComponent ~= nil then
+			return entity.TextInputComponent.Text or ""
+		end
+		return ""
+	end
+
+	@ExecSpace("ClientOnly")
+	method string StatusLabel(string text)
+		if text == nil then
+			return "지휘석"
+		end
+		if string.find(text, "연결됨", 1, true) ~= nil then
+			return "지휘석 · 연결됨"
+		end
+		if string.find(text, "실패", 1, true) ~= nil or string.find(text, "없습니다", 1, true) ~= nil then
+			return "지휘석 · 연결 실패"
+		end
+		return "지휘석 · 연결 확인"
 	end
 
 	@ExecSpace("ClientOnly")
 	method void WriteText(string entityPath, string text)
 		local entity = _EntityService:GetEntityByPath(entityPath)
-		if entity ~= nil and entity.TextComponent ~= nil then
+		if entity == nil then
+			return
+		end
+		if entity.TextGUIRendererComponent ~= nil then
+			entity.TextGUIRendererComponent.Text = text
+			return
+		end
+		if entity.TextComponent ~= nil then
 			entity.TextComponent.Text = text
 		end
 	end

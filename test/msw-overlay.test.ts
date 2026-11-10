@@ -145,7 +145,7 @@ describe('Basic workspace deploy', () => {
     };
     const deskRoot = deployedUi.ContentProto?.Entities?.find((entity) => entity.path === '/ui/AgentMapleDesk');
     const canvas = deskRoot?.jsonString?.['@components']?.find((component) => component['@type'] === 'MOD.Core.CanvasGroupComponent');
-    expect(canvas?.BlocksRaycasts).toBe(false);
+    expect(canvas?.BlocksRaycasts).toBe(true);
 
     const { workspace } = basicWorkspace(2, false);
     const map = JSON.parse(fs.readFileSync(path.join(workspace, 'map/map01.map'), 'utf8')) as {

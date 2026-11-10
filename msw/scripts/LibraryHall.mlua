@@ -158,7 +158,7 @@ script LibraryHall extends Component
 	method void SetEnabled(string entityPath, boolean enabled)
 		local entity = _EntityService:GetEntityByPath(entityPath)
 		if entity ~= nil then
-			entity.Enable = enabled
+			entity:SetEnable(enabled)
 		end
 	end
 
@@ -235,16 +235,29 @@ script LibraryHall extends Component
 	@ExecSpace("ClientOnly")
 	method string ReadText(string entityPath)
 		local entity = _EntityService:GetEntityByPath(entityPath)
-		if entity == nil or entity.TextInputComponent == nil then
+		if entity == nil then
 			return ""
 		end
-		return entity.TextInputComponent.Text or ""
+		if entity.TextGUIRendererInputComponent ~= nil then
+			return entity.TextGUIRendererInputComponent.Text or ""
+		end
+		if entity.TextInputComponent ~= nil then
+			return entity.TextInputComponent.Text or ""
+		end
+		return ""
 	end
 
 	@ExecSpace("ClientOnly")
 	method void WriteText(string entityPath, string text)
 		local entity = _EntityService:GetEntityByPath(entityPath)
-		if entity ~= nil and entity.TextComponent ~= nil then
+		if entity == nil then
+			return
+		end
+		if entity.TextGUIRendererComponent ~= nil then
+			entity.TextGUIRendererComponent.Text = text
+			return
+		end
+		if entity.TextComponent ~= nil then
 			entity.TextComponent.Text = text
 		end
 	end
