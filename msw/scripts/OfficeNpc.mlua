@@ -1,0 +1,110 @@
+--[[
+  UNVERIFIED MapleStory Worlds script source.
+  Put this on each office NPC (foreman and worker) and name the script OfficeNpc.
+  The relay sets Station and ActivityText. This script only moves the NPC.
+  There is no navmesh here: it steps in a straight line. Creator must verify movement.
+  No Maple/Nexon assets are referenced.
+]]
+
+@Component
+script OfficeNpc extends Component
+	property string SessionId = "ses_worker"
+	property string Station = "home"
+	property string ActivityText = "집에서 쉬는 중"
+	property string OwnerUserId = ""
+	property boolean CaptureOwnerOnNextEnter = true
+	property boolean MoveWarned = false
+	property number DeskX = 0
+	property number DeskY = 0
+	property number HomeX = 0
+	property number MeetingX = 0
+	property number ApproachOffset = 1.2
+	property number FloorY = 0
+	property boolean Pace = false
+	property number PaceDir = 1
+	property boolean Holding = false
+	property number LastTargetX = 0
+	property boolean DeskSaved = false
+	property string SlotLabel = ""
+	property number LibraryX = 0
+	property number MoveSpeed = 2.5
+
+	@ExecSpace("ServerOnly")
+	method void OnBeginPlay()
+		if self.DeskSaved == false then
+			local pos = self.Entity.TransformComponent.WorldPosition
+			self.FloorY = pos.y
+			self.DeskY = pos.y
+			self.HomeX = pos.x
+			self.DeskSaved = true
+		end
+		local tick = function()
+			self:Step(0.1)
+		end
+		_TimerService:SetTimerRepeat(tick, 0.1)
+	end
+
+	@ExecSpace("ServerOnly")
+	@EventSender("Service", "UserService")
+	handler HandleUserEnterEvent(UserEnterEvent event)
+		-- UserService has no world-owner field. ProfileCode is not a relay credential.
+		-- The first player to enter becomes the owner, then the switch turns off.
+		if self.CaptureOwnerOnNextEnter == true and self.OwnerUserId == "" then
+			self.OwnerUserId = event.UserId
+			self.CaptureOwnerOnNextEnter = false
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void Step(number delta)
+		-- Walk on the foothold with MoveToDirection, then stop. Do not pace in place.
+		-- Move again only when the target moves farther than 0.35, matching shouldHold.
+		local entity = self.Entity
+		if entity == nil or entity.TransformComponent == nil or entity.TransformComponent.WorldPosition == nil then
+			return
+		end
+		local movement = entity.MovementComponent
+		if movement == nil then
+			if self.MoveWarned ~= true then
+				self.MoveWarned = true
+				log("[AgentMaple] MovementComponent missing; step skipped")
+			end
+			return
+		end
+		local targetX = self.HomeX
+		if self.Station == "desk" then
+			targetX = self.DeskX
+		elseif self.Station == "meeting" then
+			targetX = self.MeetingX
+		elseif self.Station == "library" then
+			targetX = self.LibraryX
+		elseif self.Station == "user" and self.OwnerUserId ~= "" then
+			local userEntity = _UserService:GetUserEntityByUserId(self.OwnerUserId)
+			if userEntity ~= nil and userEntity.TransformComponent ~= nil and userEntity.TransformComponent.WorldPosition ~= nil then
+				targetX = userEntity.TransformComponent.WorldPosition.x + self.ApproachOffset
+			end
+		end
+		local pos = self.Entity.TransformComponent.WorldPosition
+		local dx = targetX - pos.x
+		local shift = targetX - self.LastTargetX
+		if self.Holding == true and shift < 0.35 and shift > -0.35 then
+			return
+		end
+		if dx < 0.25 and dx > -0.25 then
+			self.Holding = true
+			self.LastTargetX = targetX
+			movement:Stop()
+			return
+		end
+		self.Holding = false
+		local direction = 1
+		if dx < 0 then
+			direction = -1
+		end
+		if entity.SpriteRendererComponent ~= nil then
+			entity.SpriteRendererComponent.FlipX = direction < 0
+		end
+		movement.InputSpeed = self.MoveSpeed
+		movement:MoveToDirection(Vector2(direction, 0), delta)
+	end
+end

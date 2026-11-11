@@ -1,0 +1,288 @@
+--[[
+  UNVERIFIED MapleStory Worlds UI script.
+  Library entrance. Search, read, and one-hop neighbors display server text.
+  Choosing a kn_ id opens that entry. It does not run the text as a command.
+  No Maple/Nexon art or RUID. Creator must place the entities and confirm the layout.
+]]
+
+@Component
+script LibraryHall extends Component
+	property string RelayPath = "/maps/AgentMapleVillage/VillageRelay"
+	property string SearchInputPath = "/ui/AgentMapleLibrary/Board/SearchInput"
+	property string NodeInputPath = "/ui/AgentMapleLibrary/Board/NodeInput"
+	property string TitleInputPath = "/ui/AgentMapleLibrary/Board/TitleInput"
+	property string BodyInputPath = "/ui/AgentMapleLibrary/Board/BodyInput"
+	property string SourceInputPath = "/ui/AgentMapleLibrary/Board/SourceInput"
+	property string TaskInputPath = "/ui/AgentMapleLibrary/Board/TaskInput"
+	property string FromInputPath = "/ui/AgentMapleLibrary/Board/FromInput"
+	property string ToInputPath = "/ui/AgentMapleLibrary/Board/ToInput"
+	property string EdgeInputPath = "/ui/AgentMapleLibrary/Board/EdgeInput"
+	property string ResultTextPath = "/ui/AgentMapleLibrary/Board/ResultText"
+	property string BoardPath = "/ui/AgentMapleLibrary/Board"
+	property string OtherBoardPath = "/ui/AgentMapleDesk/Board"
+	property string OpenButtonPath = "/ui/AgentMapleLibrary/OpenButton"
+	property string SearchButtonPath = "/ui/AgentMapleLibrary/Board/SearchButton"
+	property string ReadButtonPath = "/ui/AgentMapleLibrary/Board/ReadButton"
+	property string NeighborButtonPath = "/ui/AgentMapleLibrary/Board/NeighborButton"
+	property string PublishSourceButtonPath = "/ui/AgentMapleLibrary/Board/PublishSourceButton"
+	property string PublishSummaryButtonPath = "/ui/AgentMapleLibrary/Board/PublishSummaryButton"
+	property string LinkButtonPath = "/ui/AgentMapleLibrary/Board/LinkButton"
+	property string ApproveButtonPath = "/ui/AgentMapleLibrary/Board/ApproveButton"
+	property ButtonComponent OpenButton = "c82ddef0-3622-47d3-badc-384754020a5c"
+	property ButtonComponent SearchButton = "1b4833b0-2e61-43ce-9920-6811b12d3d89"
+	property ButtonComponent ReadButton = "2d8a2370-7895-41c0-9dbc-e8268bcede95"
+	property ButtonComponent NeighborButton = "b9479a09-7ac6-45ed-acb1-0cdf0b07165d"
+	property ButtonComponent PublishSourceButton = "79338119-d640-429e-bf0b-fa3edb29a8c7"
+	property ButtonComponent PublishSummaryButton = "16c2f7c4-7c87-475a-9ca7-0c39e3c855d7"
+	property ButtonComponent LinkButton = "a465f58c-81fb-4b5f-b390-f99c2164cbe6"
+	property ButtonComponent ApproveButton = "657ada25-ac20-445c-bbf8-983a75e18203"
+	property any OpenHandler = nil
+	property any SearchHandler = nil
+	property any ReadHandler = nil
+	property any NeighborHandler = nil
+	property any PublishSourceHandler = nil
+	property any PublishSummaryHandler = nil
+	property any LinkHandler = nil
+	property any ApproveHandler = nil
+
+	@ExecSpace("ClientOnly")
+	method void OnBeginPlay()
+		local openButton = _EntityService:GetEntityByPath(self.OpenButtonPath)
+		if openButton ~= nil then
+			self.OpenHandler = openButton:ConnectEvent(ButtonClickEvent, self.OnOpenClick)
+		end
+		local searchButton = _EntityService:GetEntityByPath(self.SearchButtonPath)
+		if searchButton ~= nil then
+			self.SearchHandler = searchButton:ConnectEvent(ButtonClickEvent, self.OnSearchClick)
+		end
+		local readButton = _EntityService:GetEntityByPath(self.ReadButtonPath)
+		if readButton ~= nil then
+			self.ReadHandler = readButton:ConnectEvent(ButtonClickEvent, self.OnReadClick)
+		end
+		local neighborButton = _EntityService:GetEntityByPath(self.NeighborButtonPath)
+		if neighborButton ~= nil then
+			self.NeighborHandler = neighborButton:ConnectEvent(ButtonClickEvent, self.OnNeighborClick)
+		end
+		local publishSourceButton = _EntityService:GetEntityByPath(self.PublishSourceButtonPath)
+		if publishSourceButton ~= nil then
+			self.PublishSourceHandler = publishSourceButton:ConnectEvent(ButtonClickEvent, self.OnPublishSourceClick)
+		end
+		local publishSummaryButton = _EntityService:GetEntityByPath(self.PublishSummaryButtonPath)
+		if publishSummaryButton ~= nil then
+			self.PublishSummaryHandler = publishSummaryButton:ConnectEvent(ButtonClickEvent, self.OnPublishSummaryClick)
+		end
+		local linkButton = _EntityService:GetEntityByPath(self.LinkButtonPath)
+		if linkButton ~= nil then
+			self.LinkHandler = linkButton:ConnectEvent(ButtonClickEvent, self.OnLinkClick)
+		end
+		local approveButton = _EntityService:GetEntityByPath(self.ApproveButtonPath)
+		if approveButton ~= nil then
+			self.ApproveHandler = approveButton:ConnectEvent(ButtonClickEvent, self.OnApproveClick)
+		end
+		self:SetEnabled(self.BoardPath, false)
+		self:WriteText(self.ResultTextPath, "도서관. 세션 기록은 비공개 그래프에 남고, 출처 문장만 사실 후보가 아닙니다.")
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnEndPlay()
+		local openButton = _EntityService:GetEntityByPath(self.OpenButtonPath)
+		if openButton ~= nil and self.OpenHandler ~= nil then
+			openButton:DisconnectEvent(ButtonClickEvent, self.OpenHandler)
+		end
+		local searchButton = _EntityService:GetEntityByPath(self.SearchButtonPath)
+		if searchButton ~= nil and self.SearchHandler ~= nil then
+			searchButton:DisconnectEvent(ButtonClickEvent, self.SearchHandler)
+		end
+		local readButton = _EntityService:GetEntityByPath(self.ReadButtonPath)
+		if readButton ~= nil and self.ReadHandler ~= nil then
+			readButton:DisconnectEvent(ButtonClickEvent, self.ReadHandler)
+		end
+		local neighborButton = _EntityService:GetEntityByPath(self.NeighborButtonPath)
+		if neighborButton ~= nil and self.NeighborHandler ~= nil then
+			neighborButton:DisconnectEvent(ButtonClickEvent, self.NeighborHandler)
+		end
+		local publishSourceButton = _EntityService:GetEntityByPath(self.PublishSourceButtonPath)
+		if publishSourceButton ~= nil and self.PublishSourceHandler ~= nil then
+			publishSourceButton:DisconnectEvent(ButtonClickEvent, self.PublishSourceHandler)
+		end
+		local publishSummaryButton = _EntityService:GetEntityByPath(self.PublishSummaryButtonPath)
+		if publishSummaryButton ~= nil and self.PublishSummaryHandler ~= nil then
+			publishSummaryButton:DisconnectEvent(ButtonClickEvent, self.PublishSummaryHandler)
+		end
+		local linkButton = _EntityService:GetEntityByPath(self.LinkButtonPath)
+		if linkButton ~= nil and self.LinkHandler ~= nil then
+			linkButton:DisconnectEvent(ButtonClickEvent, self.LinkHandler)
+		end
+		local approveButton = _EntityService:GetEntityByPath(self.ApproveButtonPath)
+		if approveButton ~= nil and self.ApproveHandler ~= nil then
+			approveButton:DisconnectEvent(ButtonClickEvent, self.ApproveHandler)
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnOpenClick()
+		self:ToggleBoard()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnSearchClick()
+		self:OnSearch()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnReadClick()
+		self:OnRead()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnNeighborClick()
+		self:OnNeighbors()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnPublishSourceClick()
+		self:OnPublishSource()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnPublishSummaryClick()
+		self:OnPublishSummary()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnLinkClick()
+		self:OnLink()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnApproveClick()
+		self:OnApprove()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OpenBoard()
+		self:SetEnabled(self.BoardPath, true)
+		self:SetEnabled(self.OtherBoardPath, false)
+	end
+
+	@ExecSpace("ClientOnly")
+	method void ToggleBoard()
+		local board = _EntityService:GetEntityByPath(self.BoardPath)
+		if board == nil then
+			return
+		end
+		local open = board.Enable ~= true
+		self:SetEnabled(self.BoardPath, open)
+		if open == true then
+			self:SetEnabled(self.OtherBoardPath, false)
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void SetEnabled(string entityPath, boolean enabled)
+		local entity = _EntityService:GetEntityByPath(entityPath)
+		if entity ~= nil then
+			entity:SetEnable(enabled)
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void ShowFromServer(string text)
+		self:WriteText(self.ResultTextPath, text)
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnSearch()
+		local relay = self:Relay()
+		if relay ~= nil then
+			relay:SubmitLibrarySearch(self:ReadText(self.SearchInputPath))
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnRead()
+		local relay = self:Relay()
+		if relay ~= nil then
+			relay:SubmitLibraryRead(self:ReadText(self.NodeInputPath))
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnNeighbors()
+		local relay = self:Relay()
+		if relay ~= nil then
+			relay:SubmitLibraryNeighbors(self:ReadText(self.NodeInputPath))
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnPublishSource()
+		local relay = self:Relay()
+		if relay ~= nil then
+			relay:SubmitLibraryPublish("source", self:ReadText(self.TitleInputPath), self:ReadText(self.BodyInputPath), self:ReadText(self.SourceInputPath), self:ReadText(self.TaskInputPath))
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnPublishSummary()
+		local relay = self:Relay()
+		if relay ~= nil then
+			relay:SubmitLibraryPublish("summary", self:ReadText(self.TitleInputPath), self:ReadText(self.BodyInputPath), "", self:ReadText(self.TaskInputPath))
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnLink()
+		local relay = self:Relay()
+		if relay ~= nil then
+			relay:SubmitLibraryLink(self:ReadText(self.FromInputPath), self:ReadText(self.ToInputPath))
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnApprove()
+		local relay = self:Relay()
+		if relay ~= nil then
+			relay:SubmitLibraryApprove(self:ReadText(self.EdgeInputPath))
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method any Relay()
+		local relay = _EntityService:GetEntityByPath(self.RelayPath)
+		if relay == nil then
+			return nil
+		end
+		return relay.VillageRelay
+	end
+
+	@ExecSpace("ClientOnly")
+	method string ReadText(string entityPath)
+		local entity = _EntityService:GetEntityByPath(entityPath)
+		if entity == nil then
+			return ""
+		end
+		if entity.TextGUIRendererInputComponent ~= nil then
+			return entity.TextGUIRendererInputComponent.Text or ""
+		end
+		if entity.TextInputComponent ~= nil then
+			return entity.TextInputComponent.Text or ""
+		end
+		return ""
+	end
+
+	@ExecSpace("ClientOnly")
+	method void WriteText(string entityPath, string text)
+		local entity = _EntityService:GetEntityByPath(entityPath)
+		if entity == nil then
+			return
+		end
+		if entity.TextGUIRendererComponent ~= nil then
+			entity.TextGUIRendererComponent.Text = text
+			return
+		end
+		if entity.TextComponent ~= nil then
+			entity.TextComponent.Text = text
+		end
+	end
+end

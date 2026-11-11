@@ -1,0 +1,1079 @@
+--[[
+  UNVERIFIED MapleStory Worlds script source.
+  Paste into a server Script component named VillageRelay. This is not a .modpackage.
+  No Nexon/Maple art, RUID, or audio is included. Unofficial; not affiliated with Nexon.
+
+  HttpService notes checked against Creator Center HttpService:
+  server-only GetAndWait and PostAndWait. httpEnabled allows http:// and defaults false.
+  Unpublished Maker play uses LocalRelayBase. Published play uses RelayBase.
+]]
+
+@Component
+script VillageRelay extends Component
+	property string RelayBase = "https://relay.example/v1"
+	property string LocalRelayBase = "http://127.0.0.1:8787/v1"
+	property string ActiveBase = ""
+	property string GoalDeskPath = "/ui/AgentMapleDesk/GoalDesk"
+	property string LibraryHallPath = "/ui/AgentMapleLibrary/LibraryHall"
+	property string ForemanNpcPath = "/maps/AgentMapleVillage/Foreman"
+	property string WorkerNpcPath = "/maps/AgentMapleVillage/Worker"
+	property string ForemanActorId = "npc-foreman"
+	property string WorkerActorId = "npc-worker"
+	property string ForemanSessionId = "ses_foreman"
+	property string WorkerSessionId = "ses_worker"
+	property string NoticePath = "/maps/AgentMapleVillage/NoticeBoard"
+	property string GuidePath = "/maps/AgentMapleVillage/Guide"
+	property string BookWorkPath = "/maps/AgentMapleVillage/BookWork"
+	property string BookSourcePath = "/maps/AgentMapleVillage/BookSource"
+	-- Our relay bearer. Not the unverified HttpService.WorldToken builtin.
+	-- Declared because an undeclared self field raises "cannot set Name, no such field".
+	-- Not @Sync. OnBeginPlay does not clear a token saved on the map.
+	property string WorldToken = ""
+	property string WorldRefreshToken = ""
+	property number WorldTokenExpiresAt = 0
+	property any ClockOffset = nil
+	property string OpenDecisionId = ""
+	property string OpenBookId = ""
+	property boolean Busy = false
+	property number Cursor = 0
+	property number CommandCounter = 0
+	property string NoticeLines = ""
+	property boolean ShowDebug = false
+	property string ForemanStation = "home"
+	property string WorkerStation = "home"
+	property boolean CharactersBound = false
+	property number PollStartedAt = 0
+	property string HttpBody = ""
+	property string HttpSnippet = ""
+	property number EmptyPolls = 0
+	property number PollInterval = 2
+	property number LastPollAt = 0
+	property number LastRefreshAt = 0
+	property number HttpCount = 0
+	property number HttpWindowStart = 0
+	property boolean HttpLimited = false
+	property boolean RefreshOk = false
+	property boolean PollRetry = false
+	property string PostMethod = ""
+	@ExecSpace("ServerOnly")
+	method void OnBeginPlay()
+		self.ClockOffset = nil
+		self.OpenDecisionId = ""
+		self.OpenBookId = ""
+		self.Busy = false
+		self.Cursor = 0
+		self.CommandCounter = 0
+		self.NoticeLines = ""
+		self.CharactersBound = false
+		self.PollStartedAt = 0
+		self.ForemanStation = "home"
+		self.WorkerStation = "home"
+		self.EmptyPolls = 0
+		self.PollInterval = 2
+		self.LastPollAt = 0
+		self.LastRefreshAt = 0
+		self.HttpCount = 0
+		self.HttpWindowStart = 0
+		self.PostMethod = ""
+		self:HideEmptyAnchors()
+		self:PlaceActors()
+		local https = "false"
+		if string.sub(self.RelayBase, 1, 8) == "https://" then
+			https = "true"
+		end
+		self:Console("startup RelayBaseLen=" .. tostring(string.len(self.RelayBase)) .. " WorldTokenLen=" .. tostring(string.len(self.WorldToken)) .. " https=" .. https)
+		self:ChooseBase()
+		local tick = function()
+			if self.Busy == true then
+				local age = DateTime.UtcNow.Elapsed - self.PollStartedAt
+				if age < 35000 then
+					self:Console("poll busy age=" .. tostring(age))
+					return
+				end
+				self:Console("poll retry after stuck call")
+				self.Busy = false
+			end
+			self:Poll()
+		end
+		-- 2 seconds is 30 requests/minute. Empty replies back off to 10 seconds. Hard stop at 100/minute.
+		_TimerService:SetTimerRepeat(tick, 2)
+		self:Console("poll loop started interval=2")
+		self:Poll()
+	end
+
+	@ExecSpace("ServerOnly")
+	method void ChooseBase()
+		local published = false
+		if Environment ~= nil then
+			published = Environment:IsPublishedPlay() == true
+		end
+		if published == true then
+			self.ActiveBase = self.RelayBase
+			self:LogBase("public")
+			self:ProbeHealth()
+			return
+		end
+		_HttpService.httpEnabled = true
+		self.ActiveBase = self.LocalRelayBase
+		self:LogBase("local")
+		self:ProbeHealth()
+		if self.HttpBody == "" and string.sub(self.ActiveBase, 1, 16) == "http://127.0.0.1" then
+			self.ActiveBase = "http://localhost" .. string.sub(self.ActiveBase, 17)
+			self:LogBase("localhost")
+			self:ProbeHealth()
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void LogBase(string which)
+		local scheme = "other"
+		if string.sub(self.ActiveBase, 1, 8) == "https://" then
+			scheme = "https"
+		elseif string.sub(self.ActiveBase, 1, 7) == "http://" then
+			scheme = "http"
+		end
+		self:Console("base=" .. which .. " scheme=" .. scheme .. " baseLen=" .. tostring(string.len(self.ActiveBase)))
+	end
+
+	@ExecSpace("ServerOnly")
+	method void ProbeHealth()
+		self:ArmHttp()
+		if self.HttpLimited == true then
+			self.HttpBody = ""
+			self:PushStatus("연결 실패: 요청 한도")
+			return
+		end
+		local base = self.ActiveBase
+		if base == "" then
+			base = self.RelayBase
+		end
+		self:Console("GET /health begin baseLen=" .. tostring(string.len(base)))
+		local response = _HttpService:GetAndWait(base .. "/health", { ["Accept"] = "application/json" })
+		local raw = ""
+		if response ~= nil then
+			raw = tostring(response)
+		end
+		self.HttpBody = raw
+		local snippet = raw
+		if string.len(snippet) > 120 then
+			snippet = string.sub(snippet, 1, 120)
+		end
+		self.HttpSnippet = snippet
+		self:Console("GET /health done bodyLen=" .. tostring(string.len(raw)) .. " snippet=" .. snippet)
+		if raw == "" then
+			self:PushStatus("연결 실패: /health 응답 없음")
+		else
+			self:PushStatus("연결 확인: " .. snippet)
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void ArmHttp()
+		local now = DateTime.UtcNow.Elapsed
+		if self.HttpWindowStart == 0 or now - self.HttpWindowStart >= 60000 then
+			self.HttpWindowStart = now
+			self.HttpCount = 0
+		end
+		if self.HttpCount >= 100 then
+			self.HttpLimited = true
+			self:Console("http budget skip count=" .. tostring(self.HttpCount))
+			return
+		end
+		self.HttpLimited = false
+		self.HttpCount = self.HttpCount + 1
+	end
+
+	@ExecSpace("ServerOnly")
+	method void BindDefaultCharacters()
+		self:SendCommand("bind-npc-foreman", "character.bind", {
+			sessionId = self.ForemanSessionId,
+			mapleActorId = self.ForemanActorId,
+			displayName = "감독관",
+			role = "lead"
+		})
+		self:SendCommand("bind-npc-worker", "character.bind", {
+			sessionId = self.WorkerSessionId,
+			mapleActorId = self.WorkerActorId,
+			displayName = "작업자",
+			role = "worker"
+		})
+	end
+
+	@ExecSpace("ClientOnly")
+	method void SubmitPairingFromInput(string code)
+		self:Pair(code)
+	end
+
+	@ExecSpace("Server")
+	method void Pair(string code)
+		if code == nil or code == "" then
+			self:PushStatus("페어링 코드를 입력하세요.")
+			return
+		end
+		local body = { pairingCode = code }
+		self:PostRelay("/pair", _HttpService:JSONEncode(body))
+		local response = self.HttpBody
+		if response == "" then
+			self:PushStatus("연결 실패: 페어링 응답 없음")
+			return
+		end
+		local decoded = _HttpService:JSONDecode(response)
+		if decoded == nil or decoded.worldToken == nil then
+			self:PushStatus("페어링에 실패했습니다.")
+			return
+		end
+		self.WorldToken = decoded.worldToken
+		if decoded.refreshToken ~= nil then
+			self.WorldRefreshToken = decoded.refreshToken
+		end
+		if decoded.worldTokenExpiresAt ~= nil then
+			self.WorldTokenExpiresAt = decoded.worldTokenExpiresAt
+		end
+		-- Elapsed is documented as milliseconds, not as Unix epoch.
+		-- serverTime is the relay's Unix millisecond clock. The difference is the offset.
+		if decoded.serverTime ~= nil then
+			self.ClockOffset = decoded.serverTime - DateTime.UtcNow.Elapsed
+		else
+			self.ClockOffset = nil
+		end
+		self:BindDefaultCharacters()
+		self:PushStatus("마을과 연결되었습니다.")
+	end
+
+	@ExecSpace("ClientOnly")
+	method void SubmitGoalFromInput(string text)
+		self:SubmitGoal(text)
+	end
+
+	@ExecSpace("Server")
+	method void SubmitGoal(string text)
+		if self.WorldToken == "" then
+			self:PushStatus("먼저 페어링 코드를 입력하세요.")
+			return
+		end
+		if text == nil or text == "" then
+			self:PushStatus("목표를 입력하세요.")
+			return
+		end
+		self.CommandCounter = self.CommandCounter + 1
+		local commandId = "goal-" .. tostring(DateTime.UtcNow.Elapsed) .. "-" .. tostring(self.CommandCounter)
+		self:SendCommand(commandId, "goal.submit", { text = text, targetSessionId = self.WorkerSessionId })
+		self:PushStatus("목표를 전달했습니다.")
+	end
+
+	@ExecSpace("ClientOnly")
+	method void SubmitAnswerFromButton(string option)
+		self:SubmitAnswer(option)
+	end
+
+	@ExecSpace("Server")
+	method void SubmitAnswer(string option)
+		if self.OpenDecisionId == nil or self.OpenDecisionId == "" then
+			self:PushStatus("대기 중인 질문이 없습니다.")
+			return
+		end
+		self.CommandCounter = self.CommandCounter + 1
+		local commandId = "answer-" .. tostring(DateTime.UtcNow.Elapsed) .. "-" .. tostring(self.CommandCounter)
+		self:SendCommand(commandId, "decision.answer", { decisionId = self.OpenDecisionId, option = option })
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SendCommand(string commandId, string commandType, table payload)
+		if self.WorldToken == "" or self.ClockOffset == nil then
+			self:Console("command skipped tokenLen=" .. tostring(string.len(self.WorldToken)) .. " clock=" .. tostring(self.ClockOffset ~= nil))
+			self:PushStatus("연결 실패: 시계가 없습니다")
+			return
+		end
+		local body = {
+			commandId = commandId,
+			type = commandType,
+			issuedAt = DateTime.UtcNow.Elapsed + self.ClockOffset,
+			payload = payload
+		}
+		self:PostRelay("/commands", _HttpService:JSONEncode(body))
+		if self.HttpBody == "" then
+			return
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void Console(string line)
+		log("[AgentMaple] " .. line)
+		print("[AgentMaple] " .. line)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void RememberSnippet(string text)
+		local snippet = ""
+		if text ~= nil then
+			snippet = tostring(text)
+		end
+		if self.WorldToken ~= "" then
+			snippet = string.gsub(snippet, self.WorldToken, "redacted")
+		end
+		if self.WorldRefreshToken ~= "" then
+			snippet = string.gsub(snippet, self.WorldRefreshToken, "redacted")
+		end
+		snippet = string.gsub(snippet, [["worldToken"%s*:%s*"[^"]*"]], [["worldToken":"redacted"]])
+		snippet = string.gsub(snippet, [["refreshToken"%s*:%s*"[^"]*"]], [["refreshToken":"redacted"]])
+		snippet = string.gsub(snippet, "Bearer [^%s\"]+", "Bearer redacted")
+		if string.len(snippet) > 180 then
+			snippet = string.sub(snippet, 1, 180)
+		end
+		self.HttpSnippet = snippet
+	end
+
+	@ExecSpace("ServerOnly")
+	method void CurrentBase()
+		self.HttpSnippet = self.ActiveBase
+		if self.HttpSnippet == "" then
+			self.HttpSnippet = self.RelayBase
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void GetRelay(string path)
+		self:ArmHttp()
+		if self.HttpLimited == true then
+			self.HttpBody = ""
+			self:PushStatus("연결 실패: 요청 한도")
+			return
+		end
+		self:CurrentBase()
+		local base = self.HttpSnippet
+		local headers = { ["Authorization"] = "Bearer " .. self.WorldToken }
+		self:Console("GET " .. path .. " begin method=get baseLen=" .. tostring(string.len(base)) .. " tokenLen=" .. tostring(string.len(self.WorldToken)))
+		local response = _HttpService:GetAndWait(base .. path, headers)
+		local raw = ""
+		if response ~= nil then
+			raw = tostring(response)
+		end
+		self:RememberSnippet(raw)
+		self:Console("GET " .. path .. " done method=get bodyLen=" .. tostring(string.len(raw)) .. " snippet=" .. self.HttpSnippet)
+		self.HttpBody = raw
+	end
+
+	@ExecSpace("ServerOnly")
+	method void PostRelay(string path, string encoded)
+		-- PostAndWait already receives HttpContentType.ApplicationJson. Do not repeat Content-Type in headers.
+		self:ArmHttp()
+		if self.HttpLimited == true then
+			self.HttpBody = ""
+			self:PushStatus("연결 실패: 요청 한도")
+			return
+		end
+		self:CurrentBase()
+		local base = self.HttpSnippet
+		local headers = { ["Authorization"] = "Bearer " .. self.WorldToken }
+		local raw = ""
+		local used = ""
+		if self.PostMethod ~= "request" then
+			self:Console("POST " .. path .. " begin method=post baseLen=" .. tostring(string.len(base)) .. " tokenLen=" .. tostring(string.len(self.WorldToken)))
+			local response = _HttpService:PostAndWait(base .. path, encoded, HttpContentType.ApplicationJson, headers)
+			if response ~= nil then
+				raw = tostring(response)
+			end
+			if raw ~= "" then
+				used = "post"
+				self.PostMethod = "post"
+			end
+		end
+		if raw == "" then
+			self:ArmHttp()
+			if self.HttpLimited == true then
+				self.HttpBody = ""
+				self:PushStatus("연결 실패: 요청 한도")
+				return
+			end
+			self:Console("POST " .. path .. " begin method=request baseLen=" .. tostring(string.len(base)) .. " tokenLen=" .. tostring(string.len(self.WorldToken)))
+			local response = _HttpService:RequestAndWait(base .. path, "POST", encoded, { ["Content-Type"] = "application/json", ["Authorization"] = "Bearer " .. self.WorldToken })
+			if response ~= nil then
+				raw = tostring(response)
+			end
+			used = "request"
+			if raw ~= "" then
+				self.PostMethod = "request"
+			end
+		end
+		self:RememberSnippet(raw)
+		self:Console("POST " .. path .. " done method=" .. used .. " bodyLen=" .. tostring(string.len(raw)) .. " status=unavailable snippet=" .. self.HttpSnippet)
+		self.HttpBody = raw
+		if raw == "" then
+			self:PushStatus("POST 실패(메이커 HttpService)")
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void NoteServerTime(number serverTime)
+		self.ClockOffset = serverTime - DateTime.UtcNow.Elapsed
+		self:Console("clock offset set")
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SyncClockFromTime()
+		self:GetRelay("/time")
+		if self.HttpBody == "" then
+			self:PostRelay("/time", "{}")
+		end
+		local response = self.HttpBody
+		if response == "" then
+			return
+		end
+		local decoded = _HttpService:JSONDecode(response)
+		if decoded == nil or decoded.serverTime == nil then
+			self:PushStatus("연결 실패: serverTime 없음")
+			return
+		end
+		self:NoteServerTime(decoded.serverTime)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void MaybeRefresh()
+		if self.WorldRefreshToken == "" or self.ClockOffset == nil or self.WorldTokenExpiresAt <= 0 then
+			return
+		end
+		local now = DateTime.UtcNow.Elapsed + self.ClockOffset
+		if now < self.WorldTokenExpiresAt - 86400000 then
+			return
+		end
+		if self.LastRefreshAt > 0 and DateTime.UtcNow.Elapsed - self.LastRefreshAt < 600000 then
+			return
+		end
+		self:RefreshWorld()
+	end
+
+	@ExecSpace("ServerOnly")
+	method void RefreshWorld()
+		self.LastRefreshAt = DateTime.UtcNow.Elapsed
+		self.RefreshOk = false
+		if self.WorldRefreshToken == "" then
+			return
+		end
+		self:PostRelay("/world/refresh", _HttpService:JSONEncode({ refreshToken = self.WorldRefreshToken }))
+		if self.HttpBody == "" then
+			return
+		end
+		local decoded = _HttpService:JSONDecode(self.HttpBody)
+		if decoded == nil or decoded.worldToken == nil or decoded.refreshToken == nil then
+			self:PushStatus("연결 실패: 갱신 실패")
+			return
+		end
+		self.WorldToken = decoded.worldToken
+		self.WorldRefreshToken = decoded.refreshToken
+		if decoded.worldTokenExpiresAt ~= nil then
+			self.WorldTokenExpiresAt = decoded.worldTokenExpiresAt
+		end
+		self.RefreshOk = true
+		self:Console("world token refreshed tokenLen=" .. tostring(string.len(self.WorldToken)))
+	end
+
+	@ExecSpace("ServerOnly")
+	method void Poll()
+		if self.Busy == true then
+			return
+		end
+		local now = DateTime.UtcNow.Elapsed
+		if self.LastPollAt > 0 and now - self.LastPollAt < self.PollInterval * 1000 then
+			return
+		end
+		if self.WorldToken == "" then
+			self:Console("poll skipped WorldTokenLen=0 RelayBaseLen=" .. tostring(string.len(self.RelayBase)))
+			self:PushStatus("연결 실패: WorldToken이 비어 있습니다")
+			return
+		end
+		self.Busy = true
+		self.PollStartedAt = now
+		self.LastPollAt = now
+		self:MaybeRefresh()
+		self:GetRelay("/state?afterEventSeq=" .. tostring(self.Cursor))
+		if self.HttpBody == "" then
+			self:PostRelay("/state", _HttpService:JSONEncode({ afterEventSeq = self.Cursor }))
+		end
+		self.Busy = false
+		local response = self.HttpBody
+		if response == "" then
+			self.EmptyPolls = self.EmptyPolls + 1
+			if self.EmptyPolls >= 2 then
+				self.PollInterval = 10
+				self:Console("poll backoff interval=10")
+			end
+			if self.HttpLimited ~= true then
+				self:PushStatus("POST 실패(메이커 HttpService)")
+			end
+			return
+		end
+		self.EmptyPolls = 0
+		self.PollInterval = 2
+		local decoded = _HttpService:JSONDecode(response)
+		if decoded == nil then
+			self:PushStatus("연결 실패: JSON이 아님")
+			return
+		end
+		if decoded.ok == false then
+			if self.PollRetry ~= true and tostring(decoded.error) == "expired" then
+				self.PollRetry = true
+				self:RefreshWorld()
+				if self.RefreshOk == true then
+					self.LastPollAt = 0
+					self:Poll()
+					return
+				end
+			end
+			self.PollRetry = false
+			local reason = decoded.message or decoded.error or "거부"
+			self:PushStatus("연결 실패: " .. tostring(reason))
+			return
+		end
+		self.PollRetry = false
+		if decoded.serverTime ~= nil then
+			self:NoteServerTime(decoded.serverTime)
+		else
+			self:SyncClockFromTime()
+		end
+		if decoded.mode == "snapshot" and decoded.view ~= nil then
+			self:ApplyView(decoded.view)
+		elseif decoded.events ~= nil then
+			for i = 1, #decoded.events do
+				self:ApplyEvent(decoded.events[i])
+			end
+			self:PushStatus("연결됨")
+		else
+			self:PushStatus("연결됨")
+		end
+		if decoded.cursor ~= nil then
+			self.Cursor = decoded.cursor
+		end
+		if self.CharactersBound ~= true and self.ClockOffset ~= nil then
+			self:BindDefaultCharacters()
+			self.CharactersBound = true
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void ApplyView(table view)
+		self.OpenDecisionId = ""
+		if view.decisions ~= nil then
+			for i = 1, #view.decisions do
+				local decision = view.decisions[i]
+				if decision.status == "open" then
+					self.OpenDecisionId = decision.id
+					self:PushQuestion(decision.question)
+				end
+			end
+		end
+		if view.goals ~= nil then
+			for i = 1, #view.goals do
+				local goal = view.goals[i]
+				if goal.status == "done" then
+					self:PushResult("목표가 끝났습니다.")
+				elseif goal.status == "failed" then
+					self:PushResult("목표가 거절되거나 막혔습니다.")
+				end
+			end
+		end
+		if view.characters ~= nil then
+			for i = 1, #view.characters do
+				self:ApplyCharacter(view.characters[i])
+			end
+		end
+		if view.status ~= nil and view.status.phase ~= nil then
+			self:PushStatus("연결됨 · " .. tostring(view.status.phase))
+		else
+			self:PushStatus("연결됨")
+		end
+		if view.library ~= nil and view.library.panel ~= nil and view.library.panel.text ~= nil then
+			self:PushLibrary(view.library.panel.text)
+		end
+		if view.library ~= nil and view.library.nodes ~= nil then
+			self:PaintBooks(view.library.nodes)
+		end
+		if view.feed ~= nil then
+			self:PaintNotice(view.feed)
+		end
+		if view.decisions ~= nil or view.feed ~= nil then
+			self:PaintBoard(view.feed, view.decisions)
+		end
+		if view.meeting ~= nil and view.meeting.text ~= nil then
+			self:PaintMeeting(view.meeting.text)
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void PaintBooks(table nodes)
+		local sawWork = false
+		local sawSource = false
+		for i = 1, #nodes do
+			local node = nodes[i]
+			if node ~= nil and node.kind == "summary" then
+				sawWork = true
+			elseif node ~= nil and node.kind == "source" then
+				sawSource = true
+			end
+			self:NoteBook(node)
+		end
+		if sawWork == false then
+			self:BindBook(self.BookWorkPath, "", "빈 작업 책")
+		end
+		if sawSource == false then
+			self:BindBook(self.BookSourcePath, "", "빈 출처 책")
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void NoteBook(table node)
+		if node == nil or node.id == nil or node.kind == nil then
+			return
+		end
+		local title = node.title or "빈 책"
+		if node.revision ~= nil then
+			title = title .. " · 개정 " .. tostring(node.revision)
+		end
+		if node.kind == "summary" then
+			self:BindBook(self.BookWorkPath, node.id, title)
+		elseif node.kind == "source" then
+			self:BindBook(self.BookSourcePath, node.id, title)
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void BindBook(string path, string nodeId, string title)
+		local book = _EntityService:GetEntityByPath(path)
+		if book ~= nil and book.BookSpot ~= nil then
+			book.BookSpot:Bind(nodeId, title)
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void PaintNotice(table feed)
+		local lines = ""
+		local count = 0
+		local index = #feed
+		while index >= 1 and count < 4 do
+			local item = feed[index]
+			if item ~= nil and (item.kind == "goal" or item.kind == "decision" or item.kind == "system" or item.kind == "task" or item.kind == "change") and item.text ~= nil then
+				local who = item.sessionId or "세션 없음"
+				lines = lines .. who .. " " .. tostring(item.text) .. "\n"
+				count = count + 1
+			end
+			index = index - 1
+		end
+		if lines == "" then
+			lines = "기록된 변경이 없습니다. 파일 목록과 테스트 결과는 만들지 않습니다."
+		end
+		self.NoticeLines = lines
+		self:ShowNotice(lines)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void AppendNotice(table item)
+		if item == nil or item.text == nil then
+			return
+		end
+		if item.kind ~= "goal" and item.kind ~= "decision" and item.kind ~= "system" and item.kind ~= "task" and item.kind ~= "change" then
+			return
+		end
+		local who = item.sessionId or "세션 없음"
+		local line = who .. " " .. tostring(item.text)
+		if self.NoticeLines == "" or self.NoticeLines == "기록된 변경이 없습니다. 파일 목록과 테스트 결과는 만들지 않습니다." then
+			self.NoticeLines = line
+		else
+			self.NoticeLines = line .. "\n" .. self.NoticeLines
+		end
+		self:ShowNotice(self.NoticeLines)
+	end
+
+	@ExecSpace("ServerOnly")
+	@ExecSpace("ServerOnly")
+	method void PaintBoard(table feed, table decisions)
+		local changeText = ""
+		local testText = ""
+		local reviewText = ""
+		if feed ~= nil then
+			for i = 1, #feed do
+				local item = feed[i]
+				if item ~= nil and item.text ~= nil and item.kind == "change" then
+					changeText = changeText .. (item.sessionId or "세션 없음") .. " " .. tostring(item.text) .. "\n"
+				elseif item ~= nil and item.text ~= nil and item.kind == "test" then
+					testText = testText .. (item.sessionId or "세션 없음") .. " " .. tostring(item.text) .. "\n"
+				end
+			end
+		end
+		if decisions ~= nil then
+			for i = 1, #decisions do
+				local decision = decisions[i]
+				if decision ~= nil and decision.status == "open" and decision.question ~= nil then
+					reviewText = reviewText .. (decision.sessionId or "세션 없음") .. " " .. tostring(decision.question) .. "\n"
+				end
+			end
+		end
+		if changeText == "" then
+			changeText = "기록된 변경이 없습니다."
+		end
+		if testText == "" then
+			testText = "기록된 테스트 출력이 없습니다."
+		end
+		if reviewText == "" then
+			reviewText = "열린 리뷰나 질문이 없습니다."
+		end
+		local board = _EntityService:GetEntityByPath(self.NoticePath)
+		if board ~= nil and board.NoticeBoard ~= nil then
+			board.NoticeBoard:SetTabs(changeText, testText, reviewText)
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void PaintMeeting(string text)
+		local room = _EntityService:GetEntityByPath("/maps/AgentMapleVillage/MeetingRoom")
+		if room ~= nil and room.NameTagComponent ~= nil then
+			room.NameTagComponent.Name = "회의"
+		end
+		if room ~= nil and room.ChatBalloonComponent ~= nil then
+			room.ChatBalloonComponent.Message = text
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void BindSearchBooks(table cards)
+		if cards[1] ~= nil and cards[1].id ~= nil then
+			self:BindBook(self.BookWorkPath, cards[1].id, cards[1].title or cards[1].id)
+		end
+		if cards[2] ~= nil and cards[2].id ~= nil then
+			self:BindBook(self.BookSourcePath, cards[2].id, cards[2].title or cards[2].id)
+		end
+	end
+
+	@ExecSpace("Client")
+	method void OpenAnswerPanel()
+		local desk = _EntityService:GetEntityByPath(self.GoalDeskPath)
+		if desk ~= nil and desk.GoalDesk ~= nil then
+			desk.GoalDesk:OpenBoard()
+		end
+	end
+
+	method void ShowNotice(string lines)
+		local board = _EntityService:GetEntityByPath(self.NoticePath)
+		if board ~= nil and board.NoticeBoard ~= nil then
+			board.NoticeBoard:SetNotice(lines)
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void ApplyEvent(table event)
+		if event.type == "character.upsert" then
+			self:ApplyCharacter(event.payload)
+		elseif event.type == "decision.upsert" and event.payload ~= nil and event.payload.status == "open" then
+			self.OpenDecisionId = event.payload.id
+			self:PushQuestion(event.payload.question)
+		elseif event.type == "goal.upsert" and event.payload ~= nil and event.payload.status == "done" then
+			self:PushResult("목표가 끝났습니다.")
+		elseif event.type == "library.panel" and event.payload ~= nil then
+			self:PushLibrary(event.payload.text or "")
+			if event.payload.cards ~= nil then
+				self:BindSearchBooks(event.payload.cards)
+			end
+			if self.OpenBookId ~= "" then
+				self:PushBookDetail(self.OpenBookId, event.payload.text or "")
+			end
+		elseif event.type == "meeting.panel" and event.payload ~= nil then
+			self:PaintMeeting(event.payload.text or "회의가 아닙니다.")
+		elseif event.type == "library.node" and event.payload ~= nil then
+			self:NoteBook(event.payload)
+		elseif event.type == "feed.add" and event.payload ~= nil then
+			self:AppendNotice(event.payload)
+		elseif event.type == "task.upsert" and event.payload ~= nil and event.payload.id ~= nil and event.payload.status ~= nil then
+			local who = event.payload.assigneeSessionId or "세션 없음"
+			self:AppendNotice({ kind = "task", sessionId = who, text = "과제 " .. tostring(event.payload.id) .. " 상태 " .. tostring(event.payload.status) .. ". 변경 파일과 테스트 결과는 이 기록에 없습니다." })
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void ApplyCharacter(table character)
+		if character == nil then
+			return
+		end
+		local leaf = "Worker"
+		local npcPath = self.WorkerNpcPath
+		if character.role == "lead" then
+			leaf = "Foreman"
+			npcPath = self.ForemanNpcPath
+		end
+		local npc = _EntityService:GetEntityByPath(npcPath)
+		if npc == nil or npc.OfficeNpc == nil then
+			npc = _EntityService:GetEntityByPath("/maps/map01/" .. leaf)
+		end
+		if npc == nil or npc.OfficeNpc == nil then
+			npc = _EntityService:GetEntityByPath("/maps/AgentMapleVillage/" .. leaf)
+		end
+		if npc == nil or npc.OfficeNpc == nil then
+			self:Console("NPC path not found: " .. tostring(npcPath))
+			return
+		end
+		if character.sessionId ~= nil then
+			npc.OfficeNpc.SessionId = character.sessionId
+		end
+		if character.homeX ~= nil then
+			npc.OfficeNpc.HomeX = character.homeX
+		end
+		if character.deskX ~= nil then
+			npc.OfficeNpc.DeskX = character.deskX
+		end
+		if character.meetingX ~= nil then
+			npc.OfficeNpc.MeetingX = character.meetingX
+		end
+		if character.approachOffset ~= nil then
+			npc.OfficeNpc.ApproachOffset = character.approachOffset
+		end
+		if character.floorY ~= nil then
+			npc.OfficeNpc.FloorY = character.floorY
+			npc.OfficeNpc.DeskY = character.floorY
+		end
+		local linked = self.WorldToken ~= ""
+		local stateLabel = "연결 끊김"
+		if linked then
+			if character.station == "desk" then
+				stateLabel = "작업 중"
+			elseif character.station == "user" then
+				stateLabel = "질문"
+			elseif character.station == "meeting" then
+				stateLabel = "회의"
+			elseif character.station == "home" then
+				stateLabel = "집"
+			else
+				stateLabel = character.station or ""
+			end
+		end
+		if linked == false then
+			npc.OfficeNpc.Station = "home"
+			npc.OfficeNpc.Pace = true
+			npc.OfficeNpc.ActivityText = "릴레이에 붙어 있지 않습니다"
+		else
+			npc.OfficeNpc.Station = character.station
+			npc.OfficeNpc.ActivityText = character.activity
+			if character.pace == true then
+				npc.OfficeNpc.Pace = true
+			else
+				npc.OfficeNpc.Pace = false
+			end
+		end
+		if npc.NameTagComponent ~= nil then
+			local slot = ""
+			if npc.OfficeNpc.SlotLabel ~= nil and npc.OfficeNpc.SlotLabel ~= "" then
+				slot = npc.OfficeNpc.SlotLabel .. " · "
+			end
+			local displayName = character.displayName or leaf
+			npc.NameTagComponent.Name = displayName .. " · " .. slot .. stateLabel
+		end
+		if npc.ChatBalloonComponent ~= nil and linked and character.station == "user" then
+			npc.ChatBalloonComponent.Message = character.activity
+		end
+		if character.role == "lead" then
+			self.ForemanStation = linked and (character.station or "home") or "home"
+		else
+			self.WorkerStation = linked and (character.station or "home") or "home"
+		end
+		self:PlaceActors()
+		if npc.OfficeStatus ~= nil then
+			npc.OfficeStatus.Station = linked and (character.station or "home") or "home"
+			if linked == false then
+				npc.OfficeStatus.StatusLine = "연결 끊김. 진행 중으로 표시하지 않습니다."
+			else
+				npc.OfficeStatus.StatusLine = stateLabel .. "\n" .. (character.activity or "")
+			end
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void HideEmptyAnchors()
+		self:ShowMarker(self.BookWorkPath, false)
+		self:ShowMarker(self.BookSourcePath, false)
+		self:ShowMarker("/maps/map01/Desk1", false)
+		self:ShowMarker("/maps/map01/Desk2", false)
+		self:ShowMarker("/maps/map01/Desk3", false)
+		self:ShowMarker("/maps/map01/Desk4", false)
+		self:ShowMarker("/maps/map01/Desk5", false)
+		self:ShowMarker("/maps/map01/Desk6", false)
+		self:ShowMarker("/maps/map01/HomeForeman", false)
+		self:ShowMarker("/maps/map01/HomeWorker", false)
+		self:ShowMarker("/maps/map01/MeetingRoom", false)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void PlaceActors()
+		local debug = self.ShowDebug == true
+		self:ShowMarker("/maps/map01/Desk1", debug or self.ForemanStation == "desk")
+		self:ShowMarker("/maps/map01/Desk2", debug or self.WorkerStation == "desk")
+		self:ShowMarker("/maps/map01/HomeForeman", debug or self.ForemanStation == "home")
+		self:ShowMarker("/maps/map01/HomeWorker", debug or self.WorkerStation == "home")
+		local meeting = self.ForemanStation == "meeting" or self.WorkerStation == "meeting"
+		self:ShowMarker("/maps/map01/MeetingRoom", debug or meeting)
+		self:ShowActor("/maps/map01/Foreman", self.ForemanStation == "home" or self.ForemanStation == "user")
+		self:ShowActor("/maps/map01/Worker", self.WorkerStation == "home" or self.WorkerStation == "user")
+		self:ShowActor("/maps/AgentMapleOffice/Foreman", self.ForemanStation == "desk")
+		self:ShowActor("/maps/AgentMapleOffice/Worker", self.WorkerStation == "desk")
+		self:ShowActor("/maps/AgentMapleMeeting/Foreman", self.ForemanStation == "meeting")
+		self:ShowActor("/maps/AgentMapleMeeting/Worker", self.WorkerStation == "meeting")
+	end
+
+	@ExecSpace("ServerOnly")
+	method void ShowMarker(string path, boolean show)
+		local marker = _EntityService:GetEntityByPath(path)
+		if marker == nil then
+			return
+		end
+		if marker.SpriteRendererComponent ~= nil then
+			marker.SpriteRendererComponent.Enable = show
+		end
+		if marker.NameTagComponent ~= nil then
+			marker.NameTagComponent.Enable = show
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void ShowActor(string path, boolean show)
+		local actor = _EntityService:GetEntityByPath(path)
+		if actor == nil then
+			return
+		end
+		actor.Enable = show
+	end
+
+	@ExecSpace("ServerOnly")
+	method void PushStatus(string text)
+		self:PushUi("status", text)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void PushQuestion(string text)
+		self:PushUi("question", text)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void PushResult(string text)
+		self:PushUi("result", text)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitLibrarySearch(string query)
+		self:SendLibrary("library.search", { query = query })
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitLibraryRead(string nodeId)
+		self:SendLibrary("library.read", { nodeId = nodeId })
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitLibraryNeighbors(string nodeId)
+		self:SendLibrary("library.neighbors", { nodeId = nodeId, depth = 1 })
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitLibraryPublish(string kind, string title, string body, string sourceLabel, string taskId)
+		local payload = { explicit = true, kind = kind, title = title, body = body, authorRole = "user", authorId = "user" }
+		if sourceLabel ~= nil and sourceLabel ~= "" then
+			payload.sourceLabel = sourceLabel
+		end
+		if taskId ~= nil and taskId ~= "" then
+			payload.taskId = taskId
+		end
+		self:SendLibrary("library.publish", payload)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitLibraryLink(string fromId, string toId)
+		self:SendLibrary("library.link", { explicit = true, fromId = fromId, toId = toId, authorRole = "user", authorId = "user" })
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitLibraryApprove(string edgeId)
+		self:SendLibrary("library.approveLink", { explicit = true, edgeId = edgeId })
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SendLibrary(string commandType, table payload)
+		self.CommandCounter = self.CommandCounter + 1
+		local commandId = "lib-" .. tostring(DateTime.UtcNow.Elapsed) .. "-" .. tostring(self.CommandCounter)
+		self:SendCommand(commandId, commandType, payload)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitBookOpen(string nodeId)
+		self.OpenBookId = nodeId or ""
+		if self.WorldToken == "" or self.ClockOffset == nil then
+			self:PushBookDetail(self.OpenBookId, "공개 릴레이가 없습니다. 제목만 있고 본문과 개정 기록은 받지 못했습니다.")
+			return
+		end
+		self:SendLibrary("library.read", { nodeId = nodeId })
+	end
+
+	@ExecSpace("ServerOnly")
+	method void PushBookDetail(string nodeId, string text)
+		self:GiveBookDetail(self.BookWorkPath, nodeId, text)
+		self:GiveBookDetail(self.BookSourcePath, nodeId, text)
+	end
+
+	@ExecSpace("ServerOnly")
+	method void GiveBookDetail(string path, string nodeId, string text)
+		local book = _EntityService:GetEntityByPath(path)
+		if book ~= nil and book.BookSpot ~= nil and book.BookSpot.NodeId == nodeId then
+			book.BookSpot:ShowDetail(text)
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitGuideQuestion()
+		if self.WorldToken == "" then
+			self:PushGuide("공개 릴레이가 없습니다. 저는 저장된 책 제목만 읽고, 답을 만들지 않습니다.")
+			return
+		end
+		self:SendLibrary("library.browse", {})
+		self:PushGuide("저장된 책 목록을 요청했습니다. 세션 기록은 사실이 아닙니다.")
+	end
+
+	@ExecSpace("ClientOnly")
+	method void PushGuide(string text)
+		local guide = _EntityService:GetEntityByPath(self.GuidePath)
+		if guide ~= nil and guide.GuidePost ~= nil then
+			guide.GuidePost:ShowLine(text)
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitWorkspaceInspect(string sessionId)
+		self.CommandCounter = self.CommandCounter + 1
+		local commandId = "inspect-" .. tostring(DateTime.UtcNow.Elapsed) .. "-" .. tostring(self.CommandCounter)
+		self:SendCommand(commandId, "workspace.inspect", { sessionId = sessionId })
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitMeetingInvite()
+		self.CommandCounter = self.CommandCounter + 1
+		local commandId = "mtg-" .. tostring(DateTime.UtcNow.Elapsed) .. "-" .. tostring(self.CommandCounter)
+		self:SendCommand(commandId, "meeting.invite", { sessionIds = { self.ForemanSessionId, self.WorkerSessionId } })
+	end
+
+	@ExecSpace("ServerOnly")
+	method void SubmitMeetingClose(string meetingId, string commandType)
+		self.CommandCounter = self.CommandCounter + 1
+		local commandId = "mtg-" .. tostring(DateTime.UtcNow.Elapsed) .. "-" .. tostring(self.CommandCounter)
+		self:SendCommand(commandId, commandType, { meetingId = meetingId })
+	end
+
+	@ExecSpace("Client")
+	method void PushLibrary(string text)
+		-- UI entities exist on the client. postId 1154: do not look up /ui from the server.
+		local hall = _EntityService:GetEntityByPath(self.LibraryHallPath)
+		if hall ~= nil and hall.LibraryHall ~= nil then
+			hall.LibraryHall:ShowFromServer(text)
+		end
+	end
+
+	@ExecSpace("Client")
+	method void PushUi(string kind, string text)
+		local desk = _EntityService:GetEntityByPath(self.GoalDeskPath)
+		if desk == nil or desk.GoalDesk == nil then
+			return
+		end
+		desk.GoalDesk:ShowFromServer(kind, text)
+	end
+end

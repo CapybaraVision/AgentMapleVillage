@@ -1,0 +1,8 @@
+{
+  "relayUrl": "http://127.0.0.1:8787",
+  "profileDir": ".agentmaple/profile",
+  "backend": "sim",
+  "pollIntervalMs": 1000,
+  "desktopEnabled": false,
+  "claudeEnabled": false
+}

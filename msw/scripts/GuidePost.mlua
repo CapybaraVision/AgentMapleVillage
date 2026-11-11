@@ -1,0 +1,45 @@
+--[[
+  Static guide. It does not call a model and does not pretend the relay is up.
+]]
+
+@Component
+script GuidePost extends Component
+	property string Line = "공개 릴레이가 없습니다. 저는 저장된 책 제목만 읽고, 답을 만들지 않습니다."
+	property string RelayPath = "/maps/AgentMapleVillage/VillageRelay"
+	property string LibraryPath = "/ui/AgentMapleLibrary/LibraryHall"
+
+	@ExecSpace("ClientOnly")
+	@EventSender("Self")
+	handler HandleTouchEvent(TouchEvent event)
+		local hall = _EntityService:GetEntityByPath(self.LibraryPath)
+		if hall ~= nil and hall.LibraryHall ~= nil then
+			hall.LibraryHall:OpenBoard()
+		end
+		local relay = _EntityService:GetEntityByPath(self.RelayPath)
+		if relay ~= nil and relay.VillageRelay ~= nil then
+			relay.VillageRelay:SubmitGuideQuestion()
+			return
+		end
+		if self.Entity.ChatBalloonComponent ~= nil then
+			self.Entity.ChatBalloonComponent.Message = self.Line
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void ShowLine(string text)
+		self.Line = text
+		if self.Entity.ChatBalloonComponent ~= nil then
+			self.Entity.ChatBalloonComponent.Message = text
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void OnBeginPlay()
+		if self.Entity.NameTagComponent ~= nil then
+			self.Entity.NameTagComponent.Name = "안내"
+		end
+		if self.Entity.ChatBalloonComponent ~= nil then
+			self.Entity.ChatBalloonComponent.Message = self.Line
+		end
+	end
+end

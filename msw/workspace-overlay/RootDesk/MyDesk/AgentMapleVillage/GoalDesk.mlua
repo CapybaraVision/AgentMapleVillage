@@ -1,0 +1,232 @@
+--[[
+  UNVERIFIED MapleStory Worlds UI script.
+  UI entities exist on the client. Wire the path properties in Creator.
+  Korean strings are the player-facing copy. Do not ship Nexon UI art with this file.
+]]
+
+@Component
+script GoalDesk extends Component
+	property string RelayPath = "/maps/AgentMapleVillage/VillageRelay"
+	property string OpenButtonPath = "/ui/AgentMapleDesk/OpenButton"
+	property string PairButtonPath = "/ui/AgentMapleDesk/Board/PairButton"
+	property string GoalButtonPath = "/ui/AgentMapleDesk/Board/GoalButton"
+	property string AcceptButtonPath = "/ui/AgentMapleDesk/Board/AcceptButton"
+	property string DenyButtonPath = "/ui/AgentMapleDesk/Board/DenyButton"
+	property string GoalInputPath = "/ui/AgentMapleDesk/Board/GoalInput"
+	property string PairInputPath = "/ui/AgentMapleDesk/Board/PairInput"
+	property string StatusTextPath = "/ui/AgentMapleDesk/Board/StatusText"
+	property string QuestionTextPath = "/ui/AgentMapleDesk/Board/QuestionText"
+	property string ResultTextPath = "/ui/AgentMapleDesk/Board/ResultText"
+	property string BoardPath = "/ui/AgentMapleDesk/Board"
+	property string OtherBoardPath = "/ui/AgentMapleLibrary/Board"
+	-- Clicks use GetEntityByPath plus ConnectEvent. ButtonComponent UUID slots are not required.
+	-- A helper method with an any parameter is not in the official skeleton. Maker refresh of that form
+	-- reported LEA-3015 on this file.
+	property ButtonComponent OpenButton = "8c379ada-2063-4dc1-88ab-e5fed325cca7"
+	property ButtonComponent PairButton = "23979b01-aef0-4866-ba2b-b21121b0e5b9"
+	property ButtonComponent GoalButton = "818878eb-2212-4886-9717-5c1051f149bb"
+	property ButtonComponent AcceptButton = "d9a346f4-d39e-40a4-bdd2-f6a272ca52ac"
+	property ButtonComponent DenyButton = "e3f38642-26d6-4f67-bd17-7fb131929ffe"
+	property any OpenHandler = nil
+	property any PairHandler = nil
+	property any GoalHandler = nil
+	property any AcceptHandler = nil
+	property any DenyHandler = nil
+
+	@ExecSpace("ClientOnly")
+	method void OnBeginPlay()
+		local openButton = _EntityService:GetEntityByPath(self.OpenButtonPath)
+		if openButton ~= nil then
+			self.OpenHandler = openButton:ConnectEvent(ButtonClickEvent, self.OnOpenClick)
+		end
+		local pairButton = _EntityService:GetEntityByPath(self.PairButtonPath)
+		if pairButton ~= nil then
+			self.PairHandler = pairButton:ConnectEvent(ButtonClickEvent, self.OnPairClick)
+		end
+		local goalButton = _EntityService:GetEntityByPath(self.GoalButtonPath)
+		if goalButton ~= nil then
+			self.GoalHandler = goalButton:ConnectEvent(ButtonClickEvent, self.OnGoalClick)
+		end
+		local acceptButton = _EntityService:GetEntityByPath(self.AcceptButtonPath)
+		if acceptButton ~= nil then
+			self.AcceptHandler = acceptButton:ConnectEvent(ButtonClickEvent, self.OnAcceptClick)
+		end
+		local denyButton = _EntityService:GetEntityByPath(self.DenyButtonPath)
+		if denyButton ~= nil then
+			self.DenyHandler = denyButton:ConnectEvent(ButtonClickEvent, self.OnDenyClick)
+		end
+		self:SetEnabled(self.BoardPath, false)
+		self:WriteText(self.StatusTextPath, "공개 릴레이가 없습니다.")
+		self:WriteText(self.OpenButtonPath, "지휘석 · 연결 실패")
+		self:WriteText(self.QuestionTextPath, "질문이 오면 여기에 표시됩니다.")
+		self:WriteText(self.ResultTextPath, "")
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnEndPlay()
+		local openButton = _EntityService:GetEntityByPath(self.OpenButtonPath)
+		if openButton ~= nil and self.OpenHandler ~= nil then
+			openButton:DisconnectEvent(ButtonClickEvent, self.OpenHandler)
+		end
+		local pairButton = _EntityService:GetEntityByPath(self.PairButtonPath)
+		if pairButton ~= nil and self.PairHandler ~= nil then
+			pairButton:DisconnectEvent(ButtonClickEvent, self.PairHandler)
+		end
+		local goalButton = _EntityService:GetEntityByPath(self.GoalButtonPath)
+		if goalButton ~= nil and self.GoalHandler ~= nil then
+			goalButton:DisconnectEvent(ButtonClickEvent, self.GoalHandler)
+		end
+		local acceptButton = _EntityService:GetEntityByPath(self.AcceptButtonPath)
+		if acceptButton ~= nil and self.AcceptHandler ~= nil then
+			acceptButton:DisconnectEvent(ButtonClickEvent, self.AcceptHandler)
+		end
+		local denyButton = _EntityService:GetEntityByPath(self.DenyButtonPath)
+		if denyButton ~= nil and self.DenyHandler ~= nil then
+			denyButton:DisconnectEvent(ButtonClickEvent, self.DenyHandler)
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnOpenClick()
+		self:ToggleBoard()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnPairClick()
+		self:OnPairSubmit()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnGoalClick()
+		self:OnGoalSubmit()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnAcceptClick()
+		self:OnAccept()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnDenyClick()
+		self:OnDeny()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OpenBoard()
+		self:SetEnabled(self.BoardPath, true)
+		self:SetEnabled(self.OtherBoardPath, false)
+	end
+
+	@ExecSpace("ClientOnly")
+	method void ToggleBoard()
+		local board = _EntityService:GetEntityByPath(self.BoardPath)
+		if board == nil then
+			return
+		end
+		local open = board.Enable ~= true
+		self:SetEnabled(self.BoardPath, open)
+		if open == true then
+			self:SetEnabled(self.OtherBoardPath, false)
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void SetEnabled(string entityPath, boolean enabled)
+		local entity = _EntityService:GetEntityByPath(entityPath)
+		if entity ~= nil then
+			entity:SetEnable(enabled)
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void ShowFromServer(string kind, string text)
+		if kind == "status" then
+			self:WriteText(self.StatusTextPath, text)
+			self:WriteText(self.OpenButtonPath, self:StatusLabel(text))
+		elseif kind == "question" then
+			self:WriteText(self.QuestionTextPath, text)
+		elseif kind == "result" then
+			self:WriteText(self.ResultTextPath, text)
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnPairSubmit()
+		local code = self:ReadText(self.PairInputPath)
+		local relay = _EntityService:GetEntityByPath(self.RelayPath)
+		if relay ~= nil and relay.VillageRelay ~= nil then
+			relay.VillageRelay:SubmitPairingFromInput(code)
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnGoalSubmit()
+		local text = self:ReadText(self.GoalInputPath)
+		local relay = _EntityService:GetEntityByPath(self.RelayPath)
+		if relay ~= nil and relay.VillageRelay ~= nil then
+			relay.VillageRelay:SubmitGoalFromInput(text)
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnAccept()
+		self:Answer("이대로 진행")
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnDeny()
+		self:Answer("거절")
+	end
+
+	@ExecSpace("ClientOnly")
+	method void Answer(string option)
+		local relay = _EntityService:GetEntityByPath(self.RelayPath)
+		if relay ~= nil and relay.VillageRelay ~= nil then
+			relay.VillageRelay:SubmitAnswerFromButton(option)
+		end
+	end
+
+	@ExecSpace("ClientOnly")
+	method string ReadText(string entityPath)
+		local entity = _EntityService:GetEntityByPath(entityPath)
+		if entity == nil then
+			return ""
+		end
+		if entity.TextGUIRendererInputComponent ~= nil then
+			return entity.TextGUIRendererInputComponent.Text or ""
+		end
+		if entity.TextInputComponent ~= nil then
+			return entity.TextInputComponent.Text or ""
+		end
+		return ""
+	end
+
+	@ExecSpace("ClientOnly")
+	method string StatusLabel(string text)
+		if text == nil then
+			return "지휘석"
+		end
+		if string.find(text, "연결됨", 1, true) ~= nil then
+			return "지휘석 · 연결됨"
+		end
+		if string.find(text, "실패", 1, true) ~= nil or string.find(text, "없습니다", 1, true) ~= nil then
+			return "지휘석 · 연결 실패"
+		end
+		return "지휘석 · 연결 확인"
+	end
+
+	@ExecSpace("ClientOnly")
+	method void WriteText(string entityPath, string text)
+		local entity = _EntityService:GetEntityByPath(entityPath)
+		if entity == nil then
+			return
+		end
+		if entity.TextGUIRendererComponent ~= nil then
+			entity.TextGUIRendererComponent.Text = text
+			return
+		end
+		if entity.TextComponent ~= nil then
+			entity.TextComponent.Text = text
+		end
+	end
+end

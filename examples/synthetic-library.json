@@ -1,0 +1,35 @@
+{
+  "synthetic": true,
+  "notice": "가짜 예시입니다. 런타임이 이 파일을 읽지 않으며, 사용자 지식이나 실제 세션 기록이 아닙니다.",
+  "villageId": "vil_example",
+  "nodes": [
+    {
+      "id": "kn_1",
+      "kind": "source",
+      "assertion": "citation",
+      "assertsFact": false,
+      "title": "게시판 예시 규칙",
+      "sourceLabel": "예시 메모",
+      "revision": 1
+    },
+    {
+      "id": "kn_2",
+      "kind": "summary",
+      "assertion": "summary",
+      "assertsFact": false,
+      "title": "예시 요약",
+      "taskId": "task_1",
+      "revision": 1
+    }
+  ],
+  "edges": [
+    {
+      "id": "ke_1",
+      "fromId": "kn_2",
+      "toId": "kn_1",
+      "kind": "related",
+      "status": "proposed",
+      "assertsFact": false
+    }
+  ]
+}

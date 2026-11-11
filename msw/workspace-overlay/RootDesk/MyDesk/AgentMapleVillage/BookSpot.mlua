@@ -1,0 +1,68 @@
+--[[
+  One shelf book. NodeId is a real kn_ id or empty. This script does not invent a summary.
+  TouchEvent is the documented world click. Not Creator-tested.
+]]
+
+@Component
+script BookSpot extends Component
+	property string Shelf = "work"
+	property string NodeId = ""
+	property string TitleText = "빈 책"
+	property string DetailText = ""
+	property string RelayPath = "/maps/AgentMapleVillage/VillageRelay"
+	property any TouchHandler = nil
+
+	@ExecSpace("ClientOnly")
+	method void OnBeginPlay()
+		self:Paint()
+	end
+
+	@ExecSpace("ClientOnly")
+	@EventSender("Self")
+	handler HandleTouchEvent(TouchEvent event)
+		self:OnTouch()
+	end
+
+	@ExecSpace("ClientOnly")
+	method void OnTouch()
+		if self.NodeId ~= "" then
+			local relay = _EntityService:GetEntityByPath(self.RelayPath)
+			if relay ~= nil and relay.VillageRelay ~= nil then
+				relay.VillageRelay:SubmitBookOpen(self.NodeId)
+				return
+			end
+		end
+		self:ShowDetail(self:LocalLine())
+	end
+
+	method string LocalLine()
+		if self.DetailText ~= "" then
+			return self.DetailText
+		end
+		if self.NodeId == "" then
+			return "빈 책. 세션이 끝나면 작업 기록만 이 칸에 남습니다."
+		end
+		return self.TitleText .. " (" .. self.NodeId .. "). 본문은 릴레이가 없으면 받지 못합니다."
+	end
+
+	@ExecSpace("ServerOnly")
+	method void ShowDetail(string text)
+		self.DetailText = text
+		if self.Entity.ChatBalloonComponent ~= nil then
+			self.Entity.ChatBalloonComponent.Message = text
+		end
+	end
+
+	@ExecSpace("ServerOnly")
+	method void Bind(string nodeId, string title)
+		self.NodeId = nodeId
+		self.TitleText = title
+		self:Paint()
+	end
+
+	method void Paint()
+		if self.Entity ~= nil and self.Entity.NameTagComponent ~= nil then
+			self.Entity.NameTagComponent.Name = self.TitleText
+		end
+	end
+end

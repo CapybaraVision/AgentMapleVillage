@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "proposal": true,
+  "testedInCreator": false,
+  "floor": "single_horizontal",
+  "pathfinding": false,
+  "grid": {
+    "width": 32,
+    "height": 18,
+    "unit": "logical_cells_not_maple_tiles",
+    "note": "위에서 본 구역은 개념입니다. 실제 이동은 바닥 Y 한 줄입니다. Creator가 타일 좌표로 바꿉니다."
+  },
+  "staleAfterMs": null,
+  "staleAfterMsProposal": 15000,
+  "staleNote": "15초는 제안입니다. 릴레이가 이 값으로 쓰기를 잠그지는 않습니다.",
+  "anchors": [
+    { "id": "entrance", "zone": "entrance", "conceptX": 4, "conceptY": 14, "floorY": 0, "walkable": true, "assigned": false },
+    { "id": "command", "zone": "command", "conceptX": 16, "conceptY": 14, "floorY": 0, "walkable": true, "assigned": false, "note": "목표 입력. 질문 중 수평 이동의 목표 X." },
+    { "id": "desk_foreman", "zone": "work", "conceptX": 12, "conceptY": 4, "floorY": 0, "walkable": true, "assigned": true, "sessionId": "ses_foreman", "slotLabel": "S01" },
+    { "id": "desk_worker", "zone": "work", "conceptX": 16, "conceptY": 4, "floorY": 0, "walkable": true, "assigned": true, "sessionId": "ses_worker", "slotLabel": "S02" },
+    { "id": "desk_3", "zone": "work", "conceptX": 20, "conceptY": 4, "floorY": 0, "walkable": true, "assigned": false, "note": "빈 자리. 세션을 만들지 않습니다." },
+    { "id": "desk_4", "zone": "work", "conceptX": 12, "conceptY": 6, "floorY": 0, "walkable": true, "assigned": false },
+    { "id": "desk_5", "zone": "work", "conceptX": 16, "conceptY": 6, "floorY": 0, "walkable": true, "assigned": false },
+    { "id": "desk_6", "zone": "work", "conceptX": 20, "conceptY": 6, "floorY": 0, "walkable": true, "assigned": false },
+    { "id": "library", "zone": "library", "conceptX": 4, "conceptY": 4, "floorY": 0, "walkable": true, "assigned": false, "note": "플레이어가 걷는 열람 자리. 지식 id는 kn_ 입니다." },
+    { "id": "meeting", "zone": "meeting", "conceptX": 28, "conceptY": 4, "floorY": 0, "walkable": true, "assigned": false },
+    { "id": "review", "zone": "review", "conceptX": 28, "conceptY": 14, "floorY": 0, "walkable": true, "assigned": false, "note": "검토 화면은 아직 없습니다. 앵커만 예약합니다." }
+  ]
+}

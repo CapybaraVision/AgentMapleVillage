@@ -1,0 +1,108 @@
+# 크리에이터에 넣기
+
+공식 제작 경로로 만든 파일은 `msw/workspace-overlay`에 있습니다. `MapBuilder.fromTemplate(sideview)`와 `UIBuilder`가 썼습니다. 스킬 저장소 `MSW-Git/msw-ai-coding-plugins-official` 커밋 `96133b2991d71b66bbe1e2494d28e4cc4bf57f82`입니다. RUID는 그 스킬 안에 이미 있던 값만 복사했습니다. 새로 만든 RUID는 없습니다. 크리에이터에서 열어 보지는 않았습니다.
+
+## 백업 후 복사
+
+메이커가 플레이 중이 아닐 때, 월드의 LocalWorkspace 폴더에서:
+
+```powershell
+node tools/deploy-msw-overlay.mjs C:\path\to\the\exported\LocalWorkspace
+```
+
+모든 검사는 첫 쓰기 전에 끝납니다. 통과한 뒤에만, 덮어쓸 파일을 월드 폴더 바깥 `AgentMapleVillage-backup-<시각>`에 복사합니다. 쓰다가 실패하면 그 백업으로 되돌립니다. 끝난 뒤 메이커에서 refresh가 필요합니다. 이 스크립트는 refresh와 play를 하지 않았고, 크리에이터에서 확인하지 않았습니다.
+
+공식 맵 빌더 문서(`builder-protocol-map.md`, `entity.md`, 스킬 커밋 `96133b2991d71b66bbe1e2494d28e4cc4bf57f82`)는 새 맵 id를 월드에서 열어야 할 때 `Global/SectorConfig.config`의 `entries`에 `map://{id}`를 넣어야 할 수 있다고 적습니다. SectorConfig 편집 자체는 빌더가 다루지 않는 항목입니다. 크리에이터 Basic 내보내기에는 그 파일이 없고 `map/map01.map`가 맵입니다. 이 스크립트는 SectorConfig를 만들지 않고, 파일 모양을 추측하지 않습니다.
+
+- 파일이 없으면 마을 엔티티를 기존 `map/map01.map`에 넣습니다. 별도 `map/AgentMapleVillage.map`는 복사하지 않습니다. NPC의 Body는 그 맵의 `TileMapMode`에 맞춥니다. 0은 Rigidbody, 1은 Kinematicbody, 2는 Sideviewbody입니다.
+- 파일이 있고 `entries`가 문자열 배열이면 `map://AgentMapleVillage`를 덧붙이고 별도 맵 파일을 복사합니다. `map01`은 그대로 둡니다.
+- `entries`가 문자열 배열이 아니거나 JSON이 아니면 아무 파일도 쓰지 않습니다.
+
+`UseExtendedScriptFormat`은 `ContentProto.Json` 아래이거나 파일 맨 위에 `true`여야 합니다. 아니면 WorldConfig를 고치지 않고 멈춥니다.
+
+꼭 있어야 하는 것:
+
+- 내보낸 LocalWorkspace의 `Global`, `map`, `ui`, `RootDesk`.
+- `Global/WorldConfig.config`의 확장 스크립트 형식.
+- SectorConfig가 없을 때 `map/map01.map`. `ContentType`은 `x-mod/map`이고, `MapComponent.TileMapMode`는 0, 1, 2 중 하나입니다.
+
+없어도 되는 것:
+
+- `Global/SectorConfig.config`
+- `Environment`
+- UIPopup, UIToast, `.codeblock`
+
+추가로 받아야 하는 시드 파일은 없습니다. 맵에 넣을 엔티티와 UI는 이미 `msw/workspace-overlay`에 있습니다.
+
+`npm run sim`은 이 프로세스 안에서 목표를 끝까지 진행합니다. 메이플 세션을 열지 않고 Claude를 호출하지 않습니다.
+
+요구가 바뀌었습니다. 끝난 세션의 짧은 작업 기록은 그 마을 저장소에 그래프로 남습니다. 재시작 후에도 `kn_` id가 같습니다. 세션이 만든 연결은 `proposed`이고 사실이 아닙니다. 출처 문장은 여전히 명시적으로 올릴 때만 생깁니다. 지운 기록은 같은 내용이 다시 자동으로 들어오지 않습니다. 비밀 문자열 걸러내기는 완전하지 않습니다. 보이는 패턴만 `[가림]`으로 바꿉니다.
+
+`015e8a`를 넣은 플레이에서 지휘석 버튼은 패널을 열었고, 문구는 `공개 릴레이가 없습니다.`였습니다. 그 패널이 열렸다고 릴레이가 연결된 것은 아닙니다. 같은 플레이에서 바닥이 없어 걸어지지 않았습니다. 클릭 배선은 그대로 두었습니다.
+
+첨부된 맵은 공개 저장소에 넣지 않았습니다. 관찰만 적으면 MapleTile(모드 0)이고, 발판은 있으나 타일셋 id가 비어 있고 MapComponent에 공식 템플릿의 Gravity와 걷기 계수가 없습니다. 스폰 엔티티도 없습니다. DefaultPlayer는 `player`를 그대로 쓰며 이 배포가 그 파일을 바꾸지 않습니다. 빈 타일셋 id만 공식 템플릿 id로 채우고, 없는 이동 계수만 1로 둡니다. 이미 있는 값은 덮지 않습니다. 스폰과 마을 표식의 높이는 발판 줄입니다. 크리에이터에서 화살표 걷기는 아직 확인하지 않았습니다.
+
+플레이어 화살표가 안 먹는 플레이가 확인되었습니다. 콘솔 오류는 없었습니다. 배포 스크립트는 `DefaultPlayer`를 읽거나 쓰지 않습니다. 플레이어가 화면 가운데에 있고 마을 표식은 아래 줄에 있는 것은, 스폰 높이와 타일 줄이 달라도 차이가 1.5 이하면 스폰을 그대로 두던 배치와 맞습니다. 그 경우 바디는 발판 밖에 있고 입력은 오류 없이 멈출 수 있습니다. 이것은 그 배치에서 설명되는 범위이고, 크리에이터에서 다시 걷기 전에는 수정 완료가 아닙니다. 전체 화면 UI 루트의 `BlocksRaycasts`가 거짓이면 자식 버튼이 클릭을 받지 않습니다. 공식 캔버스 그룹은 자식 입력을 받으려면 이 값이 참입니다. 같은 값은 그 사각형 안의 월드 터치도 막습니다. 버튼이 눌리도록 루트는 참으로 둡니다.
+
+맵의 배경은 발판이 아닙니다. 배포는 `TileMapMode`를 바꾸지 않습니다. 모드를 바꾸면 공식 문서대로 기존 지형이 초기화됩니다. 타일 행이 8칸 미만이면 같은 모드의 공식 템플릿 타일만 빈 칸에 더합니다. 이미 긴 타일 행이 있으면 그 행의 위를 바닥으로 보고, 집·책상·회의·도서관 표식을 그 높이에 둡니다. 스폰이 바닥에서 1.5보다 멀리 떠 있으면 그 높이로만 내리고, X는 그대로 둡니다. 이 배치는 크리에이터에서 걸어 보며 확인하지 않았습니다.
+
+세션 NPC는 일이 없으면 자기 집 좌표에서만 짧게 왔다 갔다 합니다. 질문이 열리면 플레이어 쪽으로, 질문이 없고 목표가 진행 중이면 책상으로, 회의가 수락 또는 요청된 상태이고 일이 없으면 회의 자리로 갑니다. 진행 중인 목표나 열린 질문은 회의 때문에 취소하지 않습니다. 회의는 자리 이동이고 모델을 부르지 않으며 세션을 멈추지 않습니다. 릴레이 토큰이 없으면 집 위치에 있고 진행 중이라고 말하지 않습니다. 이동은 `MovementComponent:MoveToDirection`의 좌우 입력입니다. 높이는 바디가 타일이나 발판에 맡깁니다. 길찾기와 걷기 클립은 없습니다. 크리에이터에서 이 걸음을 확인하지 않았습니다.
+
+`workspace.inspect`는 그 세션 폴더에서 `git status`와 `git diff --numstat`만 실행합니다. 명령 문자열은 받지 않습니다. 게시판의 변경 줄은 그 출력입니다. 테스트 결과가 없으면 없다고 적습니다. 승인된 쓰기용 Claude 인자는 `--permission-mode default`이고 권한 우회 플래그는 없습니다. 클라우드 테스트는 프로세스를 주입합니다. 집 PC에서 실제 CLI를 켜는 프로브는 `AGENTMAPLE_RUN_CLAUDE_PROBE=1`이 있을 때만 읽기 전용으로 돕니다.
+
+책 엔티티를 누르면 `library.read`로 그 `kn_`의 본문, 개정 목록, 출처 이름, 연결된 id를 받아 말풍선과 도서관 글에 넣습니다. 릴레이가 없으면 제목만 있고 본문은 받지 못했다고 적습니다. 안내원은 답을 만들지 않고, 연결되면 저장된 목록만 요청합니다. NPC 이름표는 연결이 없으면 `연결 끊김`, 있으면 자리 값만 `작업 중`, `질문`, `회의`, `집`으로 적습니다. NPC가 유령으로 보인 것은 빌더 기본 스프라이트 `8ef238e0d0ca4bb783aca526cff35d11`입니다. 감독관, 작업자, 안내는 그 스프라이트를 끄고, 공식 `player` 모델과 같은 `AvatarRendererComponent`, `CostumeManagerComponent`, `AvatarStateAnimationComponent`만 붙입니다. 코스튬 RUID는 그 모델에도 없어서 넣지 않았습니다. 역할마다 다른 옷은 확인하지 못했습니다. 포탈은 공식 `model://portal`의 `PortalComponent`이고, 별 모양 스프라이트 RUID는 찾지 못해 같은 기본 스프라이트를 씁니다. `PortalEntityRef`의 JSON 형식은 읽은 문서에 없어서 TargetPortal은 비워 둡니다. 포탈 컴포넌트에는 `IsLegacy=false`를 넣습니다. 메이커 참조 선택으로 연결해야 실제로 이동합니다. SectorConfig는 만들지 않습니다.
+
+가구로 새로 확인한 RUID는 없습니다. 책상과 서가는 빌더 기본 스프라이트이고, 배경은 맵에 이미 있는 Background를 바꾸지 않습니다.
+
+서가 둘은 맵 빌더 기본 스프라이트입니다. 아바타 의상 RUID는 공식 스킬 체크아웃에서 확인하지 못했습니다. 메이커 Preset에서 아바타를 고르되, 빈 16진 id를 만들지 않습니다. UI 빌더 `avatar()`의 `material_id` 기본값은 빈 문자열이라 의상으로 치지 않습니다.
+
+지식 그래프의 기준 저장소는 프로필 옆 `library.sqlite`입니다. Node에 들어 있는 SQLite를 쓰고, 클라우드 DB나 추가 패키지는 없습니다. 예전 `state.json` 그래프는 처음 열 때 그 파일로 옮기고, 옮기기 전 내용을 `library.sqlite.json-backup`에 남깁니다. 같은 제목의 다음 작업은 새 노드가 아니라 같은 `kn_`의 수정 기록입니다. 책은 그 노드를 가리키는 세계 오브젝트이고 NPC가 아닙니다. 안내원이 질문과 안내를 맡습니다. 릴레이는 SQL을 받지 않습니다. 메이플 쪽 갱신은 기존 조회 명령을 정해진 횟수 안에서 다시 부르는 방식입니다. 연결이 끊기면 기록은 파일에 남고, 화면은 끊긴 상태를 유지합니다.
+
+`8d67ed3` 플레이에서 지휘석 열기 버튼은 패널을 열었고 글자는 `지휘석 · 연결됨`이었습니다. 보드 안 버튼은 UI 파일에 ButtonComponent 참조가 없어 눌리지 않았습니다. 스크립트는 `GetEntityByPath`로 버튼 엔티티를 찾아 `ConnectEvent(ButtonClickEvent)`를 겁니다. UUID 슬롯은 클릭에 필요 없습니다. `Pair`, `SubmitGoal`, `SubmitAnswer`는 `@ExecSpace("Server")`라서 클라이언트 호출이 서버로 넘어갑니다. 이 보드 버튼 수정은 메이커에서 다시 누르기 전에 확인된 것이 아닙니다. 맵 터치는 TouchReceiveComponent의 `[self]` TouchEvent입니다. 슬래시 명령은 쓰지 않습니다. 읽은 범위는 [creator-sources.md](creator-sources.md)입니다. 꾸미기 대기는 [polish-backlog.md](polish-backlog.md)입니다.
+
+게시판은 피드에 있는 목표, 질문, 시스템 문장만 보여 줍니다. 바꾼 파일이나 테스트 결과를 만들어 넣지 않습니다. NPC와 책은 공식 빌더의 기본 스프라이트입니다. 캐릭터 스킨 RUID는 확인된 목록에 없어 넣지 않았습니다.
+
+첫 크리에이터 플레이에서 서버 로그는 `cannot set WorldToken, no such field (at /maps/map01/VillageRelay)`였습니다. 공식 UI 런타임 문서는 선언하지 않은 `self` 대입이 그 오류로 메서드를 멈춘다고 적습니다. `.codeblock`은 메이커 refresh가 `.mlua`에서 만들고, 이 저장소는 그 파일을 쓰지 않습니다. 스크립트가 `OnBeginPlay`까지 실행되었으므로 빠진 것은 WorldToken 프로퍼티 선언입니다. `WorldToken`, `ClockOffset`, `OpenDecisionId`, `Busy`, `Cursor`, `CommandCounter`를 프로퍼티로 선언했습니다. `@Sync`는 붙이지 않습니다. 시작할 때 맵에 저장된 `WorldToken`은 비우지 않습니다. `ClockOffset`은 `/v1/state`의 `serverTime`으로 맞추고, 그 값이 없으면 `/v1/time`을 봅니다. 페어링은 토큰이 없을 때의 경로입니다.
+
+지휘석과 도서관 패널은 닫힌 채로 두고, `지휘석`과 `도서관` 버튼으로 하나씩 엽니다. 버튼 높이는 88이고 다음 칸과 겹치지 않게 간격을 두었습니다. 상태 문구는 `공개 릴레이가 없습니다.`입니다. 공개 HTTPS가 없으므로 `마을 연결 전`이라고 쓰지 않습니다.
+
+다시 배포하면 이미 있는 맵 엔티티의 사용자 값은 유지하고, 없는 스크립트 프로퍼티만 채웁니다. 예전 백업 폴더는 지우지 않습니다. 이 수정은 크리에이터에서 다시 플레이하지 않았습니다.
+
+## 들어 있는 것
+
+- `map/AgentMapleVillage.map`: 공식 사이드뷰 템플릿으로 만든 원본. TileMapMode 2. 책상 6. 세션 NPC는 `ses_foreman`(S01)과 `ses_worker`(S02)만. 나머지 책상은 빈 자리입니다. SectorConfig가 없는 Basic 월드에서는 이 파일 대신 `map01`에 같은 엔티티를 넣습니다.
+- `ui/AgentMapleDesk.ui`, `ui/AgentMapleLibrary.ui`: 지휘석과 도서관. 지식 그래프 그림이 아니라 검색, 본문, 이웃 목록입니다.
+- `RootDesk/MyDesk/AgentMapleVillage/*.mlua`: 확장 스크립트 형식의 원본.
+
+# 크리에이터 수동 조립
+
+공식 문서(Utilization of Packages, postId 647)에서 패키지는 크리에이터의 Workspace에서 Export To Package로 저장하고, Import Package로 다시 넣습니다. 리소스를 넣으려면 월드가 서버에 저장된 RUID가 필요합니다. 네이티브 항목은 그대로 패키지에 넣지 못합니다. `.mod` 전체 월드 파일의 바이트 형식은 그 문서에 없습니다.
+
+그래서 이 저장소는 가져오기용 `.mod`나 `.modpackage`를 만들지 않습니다. 만들면 크리에이터가 연다고 보장할 수 없습니다. 위 배포가 Basic 월드의 `map01`과 UI 파일을 넣는 경로입니다. 아래는 그 파일을 쓰지 않을 때 사람이 빈 월드에 붙이는 절차입니다. 지식 그래프 그림은 만들지 않습니다.
+
+## 순서
+
+1. 메이플스토리 월드 크리에이터에서 빈 월드를 새로 만듭니다. 이미 있는 AgentCraft나 다른 월드를 열지 않습니다.
+2. 가로로 걸을 수 있는 바닥을 하나 놓습니다. 위아래 방으로는 스크립트가 걷지 않습니다.
+3. 서버 엔티티에 `msw/scripts/VillageRelay.mlua`를 스크립트 이름 `VillageRelay`로 붙입니다.
+4. NPC 둘에 `OfficeNpc.mlua`를 이름 `OfficeNpc`으로 붙입니다. 감독관 `SlotLabel`은 `S01`, 작업자는 `S02`입니다. `LibraryX`는 도서관으로 쓸 바닥의 X입니다.
+5. `CaptureOwnerOnNextEnter` 기본값은 참입니다. 처음 입장한 플레이어가 `OwnerUserId`가 되고, 그 다음엔 스위치가 꺼집니다. 다른 사람을 주인으로 쓰려면 그 값을 비운 뒤 스위치를 다시 켜고 그 사람이 입장하게 합니다. `User.ProfileCode`는 릴레이 비밀번호가 아닙니다. 공식 UserService에는 월드 주인 UserId가 없습니다.
+6. UI 그룹에 목표 입력과 도서관 입력을 만들고 `GoalDesk.mlua`, `LibraryHall.mlua`를 붙입니다. 경로 프로퍼티를 실제 엔티티 경로로 바꿉니다.
+7. `VillageRelay.RelayBase`는 나중에 정한 HTTPS 주소입니다. `127.0.0.1`은 월드 서버가 닿지 못합니다.
+8. 페어링 후 응답의 `serverTime`(유닉스 밀리초)에서 `DateTime.UtcNow.Elapsed`를 뺀 값을 시계 오프셋으로 씁니다. `Elapsed`를 그대로 `issuedAt`으로 보내지 않습니다.
+
+## 스크립트와 공식 필드
+
+| 스크립트 | 공식 API | 필드 |
+| --- | --- | --- |
+| VillageRelay | `HttpService:PostAndWait`, `JSONEncode`, `JSONDecode`, `HttpContentType.ApplicationJson` | 명령 `issuedAt` = `DateTime.UtcNow.Elapsed + ClockOffset` |
+| VillageRelay | `DateTime.UtcNow` | `Elapsed`는 밀리초 정수. 유닉스 기원이라고 문서에 없음 (postId 695, 691) |
+| VillageRelay | `TimerService:SetTimerRepeat` | 상태 폴링 2초 |
+| OfficeNpc | `UserEnterEvent.UserId` | `CaptureOwnerOnNextEnter`가 켜져 있을 때만 `OwnerUserId` |
+| OfficeNpc | `UserService:GetUserEntityByUserId` | 질문 이동의 대상. 비어 있으면 책상 X에 머무름 |
+| OfficeNpc | `MovementComponent:SetWorldPosition`, `TransformComponent.WorldPosition` | Y는 시작 때 저장한 바닥. X만 변경 |
+| OfficeNpc | `NameTagComponent.Name` | 서버 `activity`와 크리에이터가 적은 `SlotLabel` |
+| GoalDesk, LibraryHall | `TextInputComponent.Text`, `TextComponent.Text`, `ButtonClickEvent` | 문자열만 서버로 전달 |
+| 실행 공간 | `@ExecSpace("ServerOnly")`, `@ExecSpace("ClientOnly")` | UI 엔티티는 클라이언트. HttpService는 서버 |
+
+라이브 크리에이터에서 이 표를 눌러 본 기록은 없습니다.
