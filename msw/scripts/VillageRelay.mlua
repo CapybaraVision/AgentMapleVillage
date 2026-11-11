@@ -204,7 +204,7 @@ script VillageRelay extends Component
 		self:Pair(code)
 	end
 
-	@ExecSpace("ServerOnly")
+	@ExecSpace("Server")
 	method void Pair(string code)
 		if code == nil or code == "" then
 			self:PushStatus("페어링 코드를 입력하세요.")
@@ -245,7 +245,7 @@ script VillageRelay extends Component
 		self:SubmitGoal(text)
 	end
 
-	@ExecSpace("ServerOnly")
+	@ExecSpace("Server")
 	method void SubmitGoal(string text)
 		if self.WorldToken == "" then
 			self:PushStatus("먼저 페어링 코드를 입력하세요.")
@@ -266,7 +266,7 @@ script VillageRelay extends Component
 		self:SubmitAnswer(option)
 	end
 
-	@ExecSpace("ServerOnly")
+	@ExecSpace("Server")
 	method void SubmitAnswer(string option)
 		if self.OpenDecisionId == nil or self.OpenDecisionId == "" then
 			self:PushStatus("대기 중인 질문이 없습니다.")

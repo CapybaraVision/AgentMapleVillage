@@ -138,4 +138,35 @@ describe('msw script contract', () => {
     }
     expect(readSource(path.join(root, 'GoalDesk.mlua'))).toContain('지휘석 · 연결됨');
   });
+
+  it('binds desk and library buttons by entity path and sends goal text to the server', () => {
+    const desk = readSource(path.join(root, 'GoalDesk.mlua'));
+    const begin = desk.slice(desk.indexOf('method void OnBeginPlay'), desk.indexOf('method void OnEndPlay'));
+    const end = desk.slice(desk.indexOf('method void OnEndPlay'), desk.indexOf('method void OnOpenClick'));
+    const wiring = `${begin}\n${end}`;
+    for (const pathName of ['OpenButtonPath', 'PairButtonPath', 'GoalButtonPath', 'AcceptButtonPath', 'DenyButtonPath']) {
+      expect(wiring).toContain(`GetEntityByPath(self.${pathName})`);
+    }
+    for (const handler of ['OnOpenClick', 'OnPairClick', 'OnGoalClick', 'OnAcceptClick', 'OnDenyClick']) {
+      expect(wiring).toContain(`ConnectEvent(ButtonClickEvent, self.${handler})`);
+    }
+    expect(wiring).not.toContain('.Entity:ConnectEvent');
+    expect(wiring).not.toContain('00000000-0000-4000-8000-000000000001');
+    expect(wiring).not.toContain('00000000-0000-4000-8000-000000000002');
+    expect(wiring).not.toContain('00000000-0000-4000-8000-000000000003');
+    expect(wiring).not.toContain('00000000-0000-4000-8000-000000000004');
+    expect(wiring).not.toContain('00000000-0000-4000-8000-000000000005');
+    const hall = readSource(path.join(root, 'LibraryHall.mlua'));
+    const hallBegin = hall.slice(hall.indexOf('method void OnBeginPlay'), hall.indexOf('method void OnEndPlay'));
+    expect(hallBegin).toContain('GetEntityByPath(self.SearchButtonPath)');
+    expect(hallBegin).toContain('ConnectEvent(ButtonClickEvent, self.OnSearchClick)');
+    expect(hallBegin).not.toContain('.Entity:ConnectEvent');
+    const relay = readSource(path.join(root, 'VillageRelay.mlua'));
+    expect(relay).toContain('@ExecSpace("Server")\n\tmethod void Pair');
+    expect(relay).toContain('@ExecSpace("Server")\n\tmethod void SubmitGoal');
+    expect(relay).toContain('@ExecSpace("Server")\n\tmethod void SubmitAnswer');
+    expect(relay).toContain('@ExecSpace("Client")\n\tmethod void PushUi');
+    expect(relay).toContain('@ExecSpace("Client")\n\tmethod void OpenAnswerPanel');
+    expect(relay).toContain('@ExecSpace("ServerOnly")\n\tmethod void SendCommand');
+  });
 });
